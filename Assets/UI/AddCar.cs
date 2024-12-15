@@ -18,6 +18,7 @@ namespace UI
         public APIscript apiManager;
         private List<GameObject> simulationCars;
         private UIManager uiManager;
+        public bool simulationModeOn = false;
 
         public void Start()
         {
@@ -36,12 +37,14 @@ namespace UI
                     simulationPanel.SetActive(true);
                     uiManager.CloseProjects();
                     uiManager.SimulationMode_InteractableOff();
+                    simulationModeOn = true;
                 }
                 else
                 {
                     statusText.text = "Off";
                     simulationPanel.SetActive(false);
                     uiManager.InteractableOn();
+                    simulationModeOn = false;
                 }
             });
             simulationCars = new List<GameObject>();

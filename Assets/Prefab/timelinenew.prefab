@@ -58,7 +58,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0, b: 0, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -176,7 +176,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0, b: 0, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -311,8 +311,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4289879296
-  m_fontColor: {r: 0, g: 0.3647059, b: 0.69803923, a: 1}
+    rgba: 4288171776
+  m_fontColor: {r: 0, g: 0.30980393, b: 0.59607846, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -1071,6 +1071,7 @@ MonoBehaviour:
   PinterestUrl: {fileID: 5200849168945805753}
   panelRectTransform: {fileID: 6297218033384888026}
   yellow: {fileID: 3555415774444751699, guid: 4cd9b27a774252442acec124de338421, type: 3}
+  darkYellow: {fileID: 5446756825344343456, guid: 40ab198d7147bff439e367cf1740159b, type: 3}
   red: {fileID: 7026449637533151126, guid: 6182a428cf4e0204981dc02a8b5afcd6, type: 3}
   redMarkerPrefab: {fileID: 6144277292660229992, guid: 86057f5258bf45c48a1e3fcf891dc104, type: 3}
   greenMarkerPrefab: {fileID: 1656096938742451806, guid: ee7f9fd9bc7c85f4fbfaeca5e68c46a5, type: 3}
@@ -1277,7 +1278,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.392}
+  m_Color: {r: 1, g: 1, b: 1, a: 0.19607843}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -1728,8 +1729,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 37, y: 48}
-  m_SizeDelta: {x: 418.2044, y: 37.0168}
+  m_AnchoredPosition: {x: 179.35071, y: 48}
+  m_SizeDelta: {x: 711.06, y: 37.0168}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &4342082477890257294
 CanvasRenderer:
@@ -1752,7 +1753,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0, b: 0, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -1987,7 +1988,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0, b: 0, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1

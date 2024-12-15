@@ -29,5 +29,6 @@ namespace Models
         public string paintTechnique;
         public string paintOriginalYear;
         public string paintDate;
+        public string modelType;
     }
 }

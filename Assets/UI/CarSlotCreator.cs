@@ -110,7 +110,7 @@ namespace UI
 
                     break;
                 case 1:
-                    currentCarSlot.transform.position = new Vector3(580f, 86f, -460f);
+                    currentCarSlot.transform.position = new Vector3(540f, 86f, -280f);
                     break;
             }
         }

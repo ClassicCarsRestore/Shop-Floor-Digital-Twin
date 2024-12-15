@@ -48,6 +48,7 @@ namespace UI
         private UpdateCarLocationInTask UpdateCarLocation;
         private Car currentCarClass;
         private UIManager uiManager;
+        private string currentCarTypeModel;
 
         // Start is called before the first frame update
         void Start()
@@ -61,6 +62,11 @@ namespace UI
             { 3, "CarPrefabs/Car4" },
             { 4, "CarPrefabs/Car5" },
             { 5, "CarPrefabs/Car6" },
+            { 6, "CarPrefabs/carDino" },
+            { 7, "CarPrefabs/DinoRed" },
+            { 8, "CarPrefabs/landrover_defender" },
+            { 9, "CarPrefabs/landrover_serie2" },
+            { 10, "CarPrefabs/berlineta" },
         };
 
             carModelDropdown.onValueChanged.AddListener(delegate
@@ -82,6 +88,7 @@ namespace UI
             currentCar = currentGameObjectCar;
             carName.text = car.make + " " + car.model + " " + car.year;
             licensePlate.text = car.licencePlate;
+            currentCarTypeModel = car.modelType;
             DateTime startDateParse;
             if (DateTime.TryParse(car.startDate, out startDateParse))
             {
@@ -111,9 +118,12 @@ namespace UI
                 CharterOfTurinLink.onClick.AddListener(() => OpenURL(Url + car.id));
             }
 
+
             InitializeColorPickerCar(colorPickerCar);
 
+
             gameObjectsCars = GameObject.Find("ProjectsList").GetComponent<ProjectsList>().GetGameObjectsCar();
+            /**
 
             if (currentCar != null && !string.IsNullOrEmpty(currentCar.name))
             {
@@ -138,11 +148,18 @@ namespace UI
                     case string name when name.Contains("Car6"):
                         SelectDropdownValue(5);
                         break;
+                    case string name when name.Contains("Car6"):
+                        SelectDropdownValue(5);
+                        break;
+                    case string name when name.Contains("Car6"):
+                        SelectDropdownValue(5);
+                        break;
                     default:
                         SelectDropdownValue(1); // Optional: Handle other cases
                         break;
                 }
             }
+            **/
 
             gameObject.SetActive(true);
 
@@ -152,11 +169,17 @@ namespace UI
         {
             this.currentColorPickerCar = colorPickerCar;
 
+            bool allowColor = currentCarTypeModel.ToLower().Contains("carprefabs/car");
+
             if (currentCarClass.paintRecordNumber != null && currentCarClass.paintRecordNumber != "")
             {
-                currentColorPickerCar.SetColorFromHex(currentCarClass.paintRecordNumber);
+                if (allowColor)
+                {
+                    currentColorPickerCar.SetColorFromHex(currentCarClass.paintRecordNumber);
+                }
                 carColorTextHex.text = currentCarClass.paintRecordNumber.ToString();
-                carColor.color = currentColorPickerCar.GetCurrentColor();
+                ColorUtility.TryParseHtmlString(currentCarClass.paintRecordNumber, out Color color);
+                carColor.color = color;
             }
 
             //carColor.color = currentColorPickerCar.GetCurrentColor();
@@ -191,16 +214,27 @@ namespace UI
         {
             if (currentColorPickerCar != null)
             {
-                currentColorPickerCar.SetColor(color);
+                bool allowColor = currentCarTypeModel.ToLower().Contains("carprefabs/car");
+                if (allowColor)
+                {
+                    currentColorPickerCar.SetColor(color);
+                }
+
                 carColor.color = color;
             }
         }
 
         private async void ColorPicker_OnSubmit(Color color)
         {
+            Debug.Log(currentColorPickerCar != null);
             if (currentColorPickerCar != null)
             {
-                currentColorPickerCar.SetColor(color);
+                bool allowColor = currentCarTypeModel.ToLower().Contains("carprefabs/car");
+                Debug.Log(allowColor);
+                if (allowColor)
+                {
+                    currentColorPickerCar.SetColor(color);
+                }
                 carColor.color = color;
                 string hexColor = ColorUtility.ToHtmlStringRGBA(color);
                 currentCarClass.paintRecordNumber = "#" + hexColor;
@@ -347,6 +381,7 @@ namespace UI
                     CopyComponents(tempNewCar, currentCar);
                     tempNewCar.GetComponent<CarObject>().carInfo = currentCar.GetComponent<CarObject>().carInfo;
                     tempNewCar.name = currentCar.GetComponent<CarObject>().carInfo.caseInstanceId + "_" + prefabPath;
+                    currentCarTypeModel = prefabPath;
                     InitializeColorPickerCar(tempNewCar.GetComponent<ColorPickerCar>());
 
                     // Destroy the temporary new car
@@ -400,7 +435,10 @@ namespace UI
             uiManager.InteractableOff();
             ProjectsList projectsList = GameObject.Find("ProjectsList").GetComponent<ProjectsList>();
             projectsList.HideOtherCars(currentCarClass.caseInstanceId);
-            carsList.gameObject.SetActive(false);
+            if (carsList != null)
+            {
+                carsList.gameObject.SetActive(false);
+            }
             var t = GameObject.Find("Canvas").GetComponent<Transform>();
             var newTimeline = Instantiate(carTimeline, t);
             RectTransform rec = newTimeline.GetComponent<RectTransform>();
@@ -409,7 +447,10 @@ namespace UI
             newTimeline.GetComponent<CarTimelineController>().OnClose += () =>
             {
                 projectsList.refreshProjectsList();
-                carsList.gameObject.SetActive(true);
+                if (carsList != null)
+                {
+                    carsList.gameObject.SetActive(true);
+                }
                 uiManager.InteractableOn();
             };
         }

@@ -1,5 +1,7 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.ConstrainedExecution;
 using System.Threading.Tasks;
 using API;
 using Models;
@@ -21,6 +23,8 @@ public class ProjectsList : MonoBehaviour
     public APIscript apiManager;
     [SerializeField] private GameObject prefabCar;
     [SerializeField] public Slider carsSlider;
+    [SerializeField] public Slider projectsTypeSlider;
+    [SerializeField] public Text projectsTitle;
     [SerializeField] private Text carsstatusText;
     [SerializeField] Button liveIconOn;
     [SerializeField] Button liveIconOff;
@@ -41,7 +45,8 @@ public class ProjectsList : MonoBehaviour
     private bool OnlyOneCar = false;
     private readonly List<string> locationsOccupied = new();
     private Dictionary<string, List<Vector3>> occupiedPositions = new Dictionary<string, List<Vector3>>();
-    private float minDistanceBetweenCars = 50f; 
+    private float minDistanceBetweenCars = 50f;
+    private Dictionary<int, string> carPrefabPaths;
 
     // Start is called before the first frame update
     void Start()
@@ -53,7 +58,7 @@ public class ProjectsList : MonoBehaviour
             Debug.LogError("APIManager not assigned to VirtualMapScrollView.");
             return;
         }
-        apiManager.ClosedProjectsReceived += OnClosedProjectsReceived;
+        //apiManager.ClosedProjectsReceived += OnClosedProjectsReceived;
 
         liveIconOn.gameObject.SetActive(false);
         liveIconOff.gameObject.SetActive(true);
@@ -62,12 +67,28 @@ public class ProjectsList : MonoBehaviour
         toggleButton.isOn = false;
         OnProjectsToggleValueChanged(false);
         carsSlider.onValueChanged.AddListener(OnCarsSliderValueChanged);
+        projectsTypeSlider.onValueChanged.AddListener(OnProjectsTypeSliderValueChanged);
 
         ProjectsButton.onClick.AddListener(() => OnButtonClicked(ProjectsButton));
         ClosedProjectsButton.onClick.AddListener(() => OnButtonClicked(ClosedProjectsButton));
 
         SetButtonColor(ProjectsButton, pressedColor, pressedTextColor);
         SetButtonColor(ClosedProjectsButton, normalColor, normalTextColor);
+
+        carPrefabPaths = new Dictionary<int, string>()
+        {
+            { 0, "CarPrefabs/Car1" }, // Path relative to the Resources folder
+            { 1, "CarPrefabs/Car2" },
+            { 2, "CarPrefabs/Car3" },
+            { 3, "CarPrefabs/Car4" },
+            { 4, "CarPrefabs/Car5" },
+            { 5, "CarPrefabs/Car6" },
+            { 6, "CarPrefabs/carDino" },
+            { 7, "CarPrefabs/DinoRed" },
+            { 8, "CarPrefabs/landrover_defender" },
+            { 9, "CarPrefabs/landrover_serie2" },
+            { 10, "CarPrefabs/berlineta" },
+        };
     }
 
     private void OnButtonClicked(Button clickedButton)
@@ -120,6 +141,21 @@ public class ProjectsList : MonoBehaviour
         }
     }
 
+    async void OnProjectsTypeSliderValueChanged(float v)
+    {
+        if (v == 1.0f)
+        {
+            ClosedProjectButtonClick();
+            projectsTitle.text = "Closed Projects";
+        }
+        else
+        {
+            OpenProjectsButtonClick();
+            projectsTitle.text = "Active Projects";
+        }
+
+    }
+
     async void OnProjectsToggleValueChanged(bool isOn)
     {
         // Check if the toggle is checked
@@ -145,6 +181,7 @@ public class ProjectsList : MonoBehaviour
                 Destroy(currentInfoPanel);
                 currentInfoPanel = null;
             }
+            projectsTypeSlider.value = 0;
         }
     }
 
@@ -199,7 +236,7 @@ public class ProjectsList : MonoBehaviour
 
         currentInfoPanel = Instantiate(CarDetails, canvas);
         RectTransform rec = currentInfoPanel.GetComponent<RectTransform>();
-        rec.anchoredPosition = new Vector2(-555, -270);
+        rec.anchoredPosition = new Vector2(-600, -270);
 
         ColorPickerCar colorPicker = null;
         GameObject currentObject = null;
@@ -300,13 +337,55 @@ public class ProjectsList : MonoBehaviour
             return;
         }
         await apiManager.GetVirtualMapLocationByIdAsync(lastActivityWithLocation.LocationId);
-        GameObject carClone = InstantiateRandomCarInSlot(new Vector3(apiManager.locationById.coordinateX, apiManager.locationById.coordinateY, apiManager.locationById.coordinateZ), apiManager.locationById.vertices, 80, 80, apiManager.locationById.id);
+        GameObject newCarPrefab = null;
+        int index = 0;
+
+        if (car.caseInstanceId.ToLower().Contains("rese"))
+        {
+            index = 7;
+            carPrefabPaths.TryGetValue(index, out string prefabPath);
+            car.modelType = prefabPath;
+            newCarPrefab = Resources.Load<GameObject>(prefabPath);
+        }
+        else if (car.caseInstanceId.ToLower().Contains("defender"))
+        {
+            index = 8;
+            carPrefabPaths.TryGetValue(index, out string prefabPath);
+            car.modelType = prefabPath;
+            newCarPrefab = Resources.Load<GameObject>(prefabPath);
+        }
+        else if (car.caseInstanceId.ToLower().Contains("serie 2"))
+        {
+            index = 9;
+            carPrefabPaths.TryGetValue(index, out string prefabPath);
+            car.modelType = prefabPath;
+            newCarPrefab = Resources.Load<GameObject>(prefabPath);
+        }
+        else if (car.caseInstanceId.ToLower().Contains("berlinetta"))
+        {
+            index = 10;
+            carPrefabPaths.TryGetValue(index, out string prefabPath);
+            car.modelType = prefabPath;
+            newCarPrefab = Resources.Load<GameObject>(prefabPath);
+        }
+        else
+        {
+            index = 2;
+            carPrefabPaths.TryGetValue(index, out string prefabPath);
+            car.modelType = prefabPath;
+            newCarPrefab = Resources.Load<GameObject>(prefabPath);
+        }
+        
+        GameObject carClone = InstantiateRandomCarInSlot(newCarPrefab, new Vector3(apiManager.locationById.coordinateX, apiManager.locationById.coordinateY, apiManager.locationById.coordinateZ), apiManager.locationById.vertices, 80, 80, apiManager.locationById.id);
         Collider carCollider = carClone.GetComponent<Collider>();
         Bounds carBounds = carCollider.bounds;
 
         if (ShouldRotateCar(new Vector3(apiManager.locationById.coordinateX, apiManager.locationById.coordinateY, apiManager.locationById.coordinateZ), carBounds, apiManager.locationById.vertices))
         {
-            Quaternion targetRotation = Quaternion.Euler(0, 90, 0);
+            Quaternion currentRotation = carClone.transform.rotation;
+            Quaternion additionalRotation = Quaternion.Euler(0, 90, 0);
+            Quaternion targetRotation = currentRotation * additionalRotation;
+
             carClone.transform.rotation = targetRotation;
             Debug.Log(carClone.transform.rotation);
         }
@@ -314,10 +393,12 @@ public class ProjectsList : MonoBehaviour
         carClone.GetComponent<CarObject>().carInfo = car;
         carClone.name = car.caseInstanceId;
         ColorPickerCar colorCar = carClone.GetComponent<ColorPickerCar>();
-        if (!string.IsNullOrEmpty(car.paintRecordNumber))
+        
+        if (!string.IsNullOrEmpty(car.paintRecordNumber) && index < 7 )
         {
-            colorCar.SetColorFromHex(car.paintRecordNumber);
+            colorCar.SetColorFromHex(car.paintRecordNumber);   // TODO
         }
+        
         gameObjectsCar.Add(carClone);
         
     }
@@ -347,6 +428,9 @@ public class ProjectsList : MonoBehaviour
         float carWidth = carBounds.size.x;
         float carLength = carBounds.size.z;
 
+        Debug.Log("carWidth " + carWidth);
+        Debug.Log("carLength " + carLength);
+
         // Car dimensions if rotated by 90 degrees
         float rotatedCarWidth = carLength;
         float rotatedCarLength = carWidth;
@@ -361,10 +445,18 @@ public class ProjectsList : MonoBehaviour
         return fitsWithRotation && !fitsWithoutRotation; // Rotate if it fits better with rotation
     }
 
-    public GameObject InstantiateRandomCarInSlot(Vector3 carSlotPosition, List<VerticesCoordinates> verticesCoordinates, float carLength, float carWidth, string carSlotId)
+    public GameObject InstantiateRandomCarInSlot(GameObject newprefabcar, Vector3 carSlotPosition, List<VerticesCoordinates> verticesCoordinates, float carLength, float carWidth, string carSlotId)
     {
         // Instantiate the car at the origin first
-        GameObject newCar = Instantiate(prefabCar, Vector3.zero, Quaternion.identity);
+        GameObject newCar;
+        if (newprefabcar.name.ToLower().Contains("car"))
+        {
+             newCar = Instantiate(newprefabcar, Vector3.zero, Quaternion.identity);
+        }
+        else
+        {
+             newCar = Instantiate(newprefabcar, Vector3.zero, Quaternion.Euler(0, 90, 0));
+        }
 
         // Initialize min and max slot boundaries in world space
         Vector3 minSlot = new Vector3(float.MaxValue, 0, float.MaxValue);
@@ -477,19 +569,24 @@ public class ProjectsList : MonoBehaviour
         await GetAndPopulateProjectButtons();
     }
 
-    public void ClosedProjectButtonClick()
+    public async void ClosedProjectButtonClick()
     {
-        PopulateClosedCarsButtons();
+        //await PopulateClosedCarsButtons();
+        ClearButtons();
+        await OnClosedProjectsReceived();
     }
 
     public async Task PopulateClosedCarsButtons()
     {
         ClearButtons();
         await apiManager.GetClosedProjectsAsync();
+
     }
 
-    private void OnClosedProjectsReceived(List<Car> closedProjects)
+    private async Task OnClosedProjectsReceived()
     {
+        await apiManager.GetClosedProjectsAsync();
+        var closedProjects = apiManager.closedProjects;
         if (closedProjects.Count == 0)
         {
             NoClosedProjectsText.gameObject.SetActive(true);
@@ -502,8 +599,67 @@ public class ProjectsList : MonoBehaviour
                 newClosedProject.gameObject.name = closedProject.id;
                 newClosedProject.transform.GetChild(0).GetComponent<Text>().text = closedProject.make + " " + closedProject.model + " " + closedProject.year;
                 newClosedProject.transform.GetChild(1).GetComponent<Text>().text = closedProject.licencePlate;
+                int numberPendingActions = await PendingActions(closedProject.caseInstanceId);
+
+                if (apiManager.GetRole().Equals(APIscript.OWNER))
+                {
+                    pendingActionsText.gameObject.SetActive(false);
+                    newClosedProject.transform.GetChild(2).GetComponent<Text>().text = "";
+                }
+                else if (numberPendingActions != 0)
+                {
+                    newClosedProject.transform.GetChild(2).GetComponent<Text>().text = "Yes (" + numberPendingActions + ")";
+                }
+                else
+                {
+                    newClosedProject.transform.GetChild(2).GetComponent<Text>().text = "No";
+                }
+                newClosedProject.onClick.AddListener(() => ShowClosedCarInfo(closedProject));
                 newClosedProject.gameObject.SetActive(true);
             }
+        }
+    }
+
+    public async void ShowClosedCarInfo(Car car)
+    {
+        liveIconOn.gameObject.SetActive(false);
+        liveIconOff.gameObject.SetActive(true);
+        carsstatusText.text = "Off";
+        DestroyCars();
+        occupiedPositions.Clear(); currentCarClass = car;
+
+        if (currentInfoPanel != null)
+        {
+            Destroy(currentInfoPanel);
+            currentInfoPanel = null; // Clear the reference
+        }
+
+        currentInfoPanel = Instantiate(CarDetails, canvas);
+        RectTransform rec = currentInfoPanel.GetComponent<RectTransform>();
+        rec.anchoredPosition = new Vector2(-600, -270);
+
+        ColorPickerCar colorPicker = null;
+        GameObject currentObject = null;
+
+        await InstatiateCar(car);
+        OnlyOneCar = true;
+
+        foreach (GameObject carobject in gameObjectsCar)
+        {
+            Debug.Log(carobject.name);
+            if (carobject.name.Contains(car.caseInstanceId))
+            {
+                Debug.Log("entrei");
+                colorPicker = carobject.GetComponent<ColorPickerCar>();
+                currentObject = carobject;
+            }
+        }
+
+        currentInfoPanel.GetComponent<CarInfoDetailPanel>().SetUp(car, colorPicker, currentObject);
+        var cameraSystem = GameObject.Find("CameraSystem").GetComponent<CameraSystem>();
+        if (cameraSystem != null && currentObject != null)
+        {
+            cameraSystem.FocusOnCar(currentObject.transform.position);
         }
     }
 

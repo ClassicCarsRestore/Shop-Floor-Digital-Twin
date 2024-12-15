@@ -37,6 +37,7 @@ namespace UI
         [SerializeField] private Button PinterestUrl;
         [SerializeField] private RectTransform panelRectTransform; // Reference to the panel's RectTransform
         [SerializeField] private GameObject yellow;
+        [SerializeField] private GameObject darkYellow;
         [SerializeField] private GameObject red;
         [SerializeField] private GameObject redMarkerPrefab; // Prefab for the timeline markers
         [SerializeField] private GameObject greenMarkerPrefab; // Prefab for the timeline markers
@@ -62,6 +63,9 @@ namespace UI
         private bool topCamera = true;
         private List<GameObject> carSlots = new();
         private List<GameObject> firstFloorAreas = new();
+        private float carWidth;
+        private float carLength;
+
 
         private void Update()
         {
@@ -85,7 +89,12 @@ namespace UI
             highlightSelectionCar = GameObject.Find("HighlightAndSelection").GetComponent<HighlightAndSelection>();
             highlightSelectionCar.SelectionOff();
             currentCar = car;
-            Debug.Log(currentCar.transform.rotation);
+
+            Collider carCollider = car.GetComponent<Collider>();
+            Bounds carBounds = carCollider.bounds;
+            carWidth = carBounds.size.x;
+            carLength = carBounds.size.z;
+        
             currentCar.gameObject.SetActive(false);
             activityAndLocationHistory = EliminateActivitiesWithNoLocation(history);
             workshopRoof = GameObject.Find("oficina").GetComponent<Roof>();
@@ -104,7 +113,7 @@ namespace UI
             ChangeCameraToTop();
             //MoveCarToActivity(0);
             //OnSliderValueChanged(0);
-            FocusOnCar(0, -1);
+            FocusOnCar(0, 0);
             StartCoroutine(ForceUpdateLayout());
         }
 
@@ -253,7 +262,16 @@ namespace UI
 
                     if (individualWidth > 0)
                     {
-                        GameObject middleMarker = Instantiate(yellow, sliderFillArea);
+                        GameObject middleMarker;
+                        if (string.IsNullOrEmpty(currentTask.boardSectionUrl)) 
+                        {
+                             middleMarker = Instantiate(yellow, sliderFillArea);
+                        }
+                        else
+                        {
+                             middleMarker = Instantiate(darkYellow, sliderFillArea);
+                        }
+
                         middleMarker.GetComponent<RectTransform>().anchoredPosition = new Vector2(-900 + taskStartPos, 0);
                         middleMarker.GetComponent<RectTransform>().sizeDelta = new Vector2(individualWidth, sliderFillArea.rect.height);
                     }
@@ -288,7 +306,7 @@ namespace UI
                     await apiManager.GetVirtualMapLocationByIdAsync(activity.LocationId);
                     if (!carInstancesByLocation.ContainsKey(apiManager.locationById.id))
                     {
-                        GameObject carInstance;
+                        GameObject carInstance = null;
                         GameObject carSlot = InstantiateLocation(apiManager.locationById);
                         if (apiManager.locationById.capacity != 0)
                         {
@@ -298,10 +316,13 @@ namespace UI
 
                             if (ShouldRotateCar(carSlot, carBounds, apiManager.locationById.vertices))
                             {
-                                carInstance.transform.Rotate(0, 90, 0);
+                                Quaternion currentRotation = carInstance.transform.rotation;
+                                Quaternion additionalRotation = Quaternion.Euler(0, 90, 0);
+                                Quaternion targetRotation = currentRotation * additionalRotation;
+                                carInstance.transform.rotation = targetRotation;
                             }
 
-                            carInstance.SetActive(true);
+                            carInstance.SetActive(false);
                             carSlot.name = apiManager.locationById.name;
                             carInstance.name = activityAndLocationHistory.CaseInstanceId;
                         }
@@ -324,6 +345,7 @@ namespace UI
             }
         }
 
+        
         bool ShouldRotateCar(GameObject carSlot, Bounds carBounds, List<VerticesCoordinates> slotVertices)
         {
 
@@ -351,8 +373,8 @@ namespace UI
             float slotLength = maxSlot.z - minSlot.z;
 
             // Car dimensions (current orientation)
-            float carWidth = carBounds.size.x;
-            float carLength = carBounds.size.z;
+            //float carWidth = carBounds.size.x;
+            //float carLength = carBounds.size.z;
 
             // Car dimensions if rotated by 90 degrees
             float rotatedCarWidth = carLength;
@@ -365,13 +387,27 @@ namespace UI
             bool fitsWithRotation = (rotatedCarWidth <= slotWidth && rotatedCarLength <= slotLength);
 
             // Decide whether to rotate the car or not
-            return fitsWithRotation && fitsWithoutRotation; // Rotate if it fits better with rotation
+            return fitsWithRotation && !fitsWithoutRotation; // Rotate if it fits better with rotation
         }
 
+        
         public GameObject InstantiateRandomCarInSlot(Vector3 carSlotPosition, List<VerticesCoordinates> verticesCoordinates, float carLength, float carWidth)
         {
+
+            Car carInfo = currentCar.GetComponent<CarObject>().carInfo;
+            GameObject newCar;
+            if (carInfo.modelType.ToLower().Contains("carprefabs/car"))
+            {
+                newCar = Instantiate(currentCar, Vector3.zero, Quaternion.identity);
+            }
+            else
+            {
+                newCar = Instantiate(currentCar, Vector3.zero, Quaternion.Euler(0, 90, 0));
+            }
+
+
             // Instantiate the car at the origin first
-            GameObject newCar = Instantiate(currentCar, Vector3.zero, Quaternion.identity);
+           // GameObject newCar = Instantiate(currentCar, Vector3.zero, Quaternion.identity);
 
             // Initialize min and max slot boundaries in world space
             Vector3 minSlot = new Vector3(float.MaxValue, 0, float.MaxValue);
@@ -395,11 +431,12 @@ namespace UI
             float halfCarLength = carLength / 2;
             float halfCarWidth = carWidth / 2;
 
+            /**
             Debug.Log(minSlot.x + halfCarWidth);
             Debug.Log(maxSlot.x - halfCarWidth);
             Debug.Log(minSlot.z + halfCarLength);
             Debug.Log(maxSlot.z - halfCarLength);
-
+            **/
 
             // Generate random X and Z within the slot's boundaries, ensuring the car fits
             float randomX = UnityEngine.Random.Range(minSlot.x + halfCarWidth, maxSlot.x - halfCarWidth);
@@ -494,6 +531,7 @@ namespace UI
             {
                 currentActivityIndex = -1;
                 currentCar.gameObject.SetActive(false);
+                PinterestUrl.gameObject.SetActive(false);
                 Debug.Log("No activity and no location");
                 ActivityNumber.text = "No Activity";
                 ActivityInfo.text = "During this gap there´s no tasks and locations associated with the car.";
@@ -504,9 +542,20 @@ namespace UI
 
         private void FocusOnCar(int newIndex, int oldIndex)
         {
-
+            if (oldIndex != -1)
+            {
+                carInstances[oldIndex].gameObject.SetActive(false);
+            }
+            else
+            {
+                for (int i = 0; i < taskPositions.Count; i++)
+                {
+                    carInstances[i].gameObject.SetActive(false);
+                }
+            }
             if (carInstances.TryGetValue(newIndex, out GameObject carInstance))
             {
+                carInstance.gameObject.SetActive(true);
                 Vector3 carPos = carInstance.transform.position;
                 ChangeCameraToCar(carPos);
                 var activity = activityAndLocationHistory.History[newIndex];

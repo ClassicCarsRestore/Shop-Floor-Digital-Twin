@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Models;
 using Objects;
+using UI;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UIElements;
@@ -18,8 +19,14 @@ public class HighlightAndSelection : MonoBehaviour
     private GameObject currentHover = null;
     private readonly GameObject currentInfoPanel = null;
     public Transform canvas;
+    private AddCar addCarScript;
 
     private Boolean isSelectionOn = true;
+
+    private void Start()
+    {
+        addCarScript = FindObjectOfType<AddCar>();
+    }
 
     private void Update()
     {
@@ -64,8 +71,10 @@ public class HighlightAndSelection : MonoBehaviour
                 return; // Do nothing if clicking on UI
             }
 
+
             if (highlight)
             {
+                Debug.Log("aqui1");
 
                 if (selection != null)
                 {
@@ -79,6 +88,8 @@ public class HighlightAndSelection : MonoBehaviour
             }
             else
             {
+                Debug.Log("aqui2");
+
                 if (selection)
                 {
                     selection.gameObject.GetComponent<Outline>().enabled = false;
@@ -87,6 +98,11 @@ public class HighlightAndSelection : MonoBehaviour
                 }
             }
 
+        }
+
+        if (addCarScript != null && addCarScript.simulationModeOn && selection != null &&Input.GetKeyDown(KeyCode.R))
+        {
+            selection.gameObject.transform.Rotate(0, 15, 0);
         }
 
     }

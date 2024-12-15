@@ -3890,6 +3890,8 @@ MonoBehaviour:
       m_Image: {fileID: 0}
     - m_Text: Car6
       m_Image: {fileID: 0}
+    - m_Text: Dino
+      m_Image: {fileID: 0}
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []
@@ -4685,11 +4687,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7060270110394732703, guid: f92bc155b4600c54cacbd71a45a1d044, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 196.5261
+      value: 372.1326
       objectReference: {fileID: 0}
     - target: {fileID: 7060270110394732703, guid: f92bc155b4600c54cacbd71a45a1d044, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 1.7363
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7060270110394732703, guid: f92bc155b4600c54cacbd71a45a1d044, type: 3}
       propertyPath: m_AnchoredPosition.y

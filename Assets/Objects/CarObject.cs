@@ -13,14 +13,10 @@ namespace Objects
 
     public class CarObject : MonoBehaviour
     {
+
         private Plane daggingPlane;
-
-       
         private Vector3 offset;
-
-      
         private Camera mainCamera;
-
         private bool isDraggable = false;
         private bool isDragging = false;
         private bool isOverSlot = false;
@@ -34,14 +30,6 @@ namespace Objects
             // Cache the camera at the start. 
             mainCamera = Camera.main;
             warningSign.SetActive(false);
-        }
-
-        private void Update()
-        {
-            if (Input.GetKeyDown(KeyCode.R) && isDraggable)
-            {
-                transform.Rotate(0, 15, 0);
-            }
         }
 
         void OnMouseDown()

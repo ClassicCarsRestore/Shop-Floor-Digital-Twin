@@ -26,3 +26,6 @@ UserSettings/
 
 # Mac OS specific
 .DS_Store
+
+.vs/
+
