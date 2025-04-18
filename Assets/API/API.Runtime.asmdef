@@ -1,0 +1,16 @@
+{
+    "name": "API.Runtime",
+    "rootNamespace": "",
+    "references": [
+        "GUID:cbc59d471bbedaf47b23760cf46aa4fb"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
