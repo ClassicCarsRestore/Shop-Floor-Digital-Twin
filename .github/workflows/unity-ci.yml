@@ -28,15 +28,6 @@ jobs:
             Library-${{ env.UNITY_VERSION }}-
             Library-
 
-      # 3. Ativar licença Unity (Student)
-      - name: Activate Student License
-        uses: game-ci/unity-activate@v2
-        with:
-            unityVersion: ${{ env.UNITY_VERSION }}
-            customImage: unityci/editor:ubuntu-2022.3.13f1-windows-mono-3
-        env:
-            UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
-
       # 4. Executar testes (PlayMode)
       - name: Run PlayMode Tests
         id: tests
