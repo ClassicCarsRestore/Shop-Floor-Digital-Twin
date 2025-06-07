@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  UNITY_VERSION: 2022.3.13f1
+  UNITY_VERSION: 2022.3.15f1
   PROJECT_PATH: .  
 
 jobs:
