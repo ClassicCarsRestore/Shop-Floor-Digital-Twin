@@ -14,8 +14,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # Checkout
-    - uses: actions/checkout@v4.2.1
+    - uses: actions/checkout@v4.2.1 # Checkout
 
     # Cache da Library para acelerar re‑runs
     - name: Cache Library
@@ -29,30 +28,30 @@ jobs:
 
     
     # Instala o Editor Unity
-      - name: Install Unity
-        uses: game-ci/unity-builder@v4
-        with:
-          unityVersion: ${{ env.UNITY_VERSION }}
-          projectPath: ${{ env.PROJECT_PATH }}
-          targetPlatform: StandaloneWindows64 
+    - name: Install Unity
+      uses: game-ci/unity-builder@v4
+      with:
+        unityVersion: ${{ env.UNITY_VERSION }}
+        projectPath: ${{ env.PROJECT_PATH }}
+        targetPlatform: StandaloneWindows64 
 
-      # Ativa a licença Unity 
-      - name: Activate Student License
-        uses: game-ci/unity-activate@v2
-        with:
-          unityVersion: ${{ env.UNITY_VERSION }}
-        env:
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+    # Ativa a licença Unity 
+    - name: Activate Student License
+      uses: game-ci/unity-activate@v2
+      with:
+        unityVersion: ${{ env.UNITY_VERSION }}
+      env:
+        UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
 
-      #  Executa os testes (PlayMode)
-      - name: Run PlayMode Tests
-        id: tests
-        uses: game-ci/unity-test-runner@v4
-        with:
-          unityVersion: ${{ env.UNITY_VERSION }}
-          projectPath: ${{ env.PROJECT_PATH }}
-          testMode: playmode              
-          artifactsPath: TestResults
+    #  Executa os testes (PlayMode)
+    - name: Run PlayMode Tests
+      id: tests
+      uses: game-ci/unity-test-runner@v4
+      with:
+        unityVersion: ${{ env.UNITY_VERSION }}
+        projectPath: ${{ env.PROJECT_PATH }}
+        testMode: playmode              
+        artifactsPath: TestResults
    
 
     # Relatórios
