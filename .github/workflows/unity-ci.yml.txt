@@ -1,0 +1,65 @@
+name: Unity CI (testes e/ou build)
+
+on:
+  push:
+    branches: [ main, master ]
+
+
+env:
+  UNITY_VERSION: 2022.3.13f1
+  PROJECT_PATH: .  
+      
+jobs:
+  unity-job:
+    runs-on: ubuntu-latest
+
+    steps:
+    # Checkout
+    - uses: actions/checkout@v4.2.1
+
+    # Cache da Library para acelerar re‑runs
+    - name: Cache Library
+      uses: actions/cache@v4.2.3
+      with:
+        path: ${{ env.PROJECT_PATH }}/Library
+        key:  Library-${{ env.UNITY_VERSION }}-${{ hashFiles('**/Packages/manifest.json') }}
+        restore-keys: |
+          Library-${{ env.UNITY_VERSION }}-
+          Library-
+
+    
+    # Instala o Editor Unity
+      - name: Install Unity
+        uses: game-ci/unity-builder@v4
+        with:
+          unityVersion: ${{ env.UNITY_VERSION }}
+          projectPath: ${{ env.PROJECT_PATH }}
+          targetPlatform: StandaloneWindows64 
+
+      # Ativa a licença Unity 
+      - name: Activate Student License
+        uses: game-ci/unity-activate@v2
+        with:
+          unityVersion: ${{ env.UNITY_VERSION }}
+        env:
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+
+      #  Executa os testes (PlayMode)
+      - name: Run PlayMode Tests
+        id: tests
+        uses: game-ci/unity-test-runner@v4
+        with:
+          unityVersion: ${{ env.UNITY_VERSION }}
+          projectPath: ${{ env.PROJECT_PATH }}
+          testMode: playmode              
+          artifactsPath: TestResults
+   
+
+    # Relatórios
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      with:
+        name: Unity-PlayMode-Tests
+        path: ${{ steps.tests.outputs.artifactsPath }}
+
+ 

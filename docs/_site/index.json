@@ -1,0 +1,22 @@
+{
+  "docs/introduction.html": {
+    "href": "docs/introduction.html",
+    "title": "Introdução e Arquitetura | Digital Twin - Classic Cars Restoration",
+    "summary": "Introdução e Arquitetura O ShopFloor Digital Twin replica virtualmente uma oficina de restauro de carros clássicos, com foco na monitorização e documentação do processo. Objetivos Representar no espaço virtual a oficina e os veículos. Sincronizar dados de sensores IoT com o ambiente virtual. Demonstrar em tempo real o progresso do restauro. Arquitetura do Sistema Componentes principais: Unity 3D: Motor de visualização e simulação do ambiente da oficina e dos carros. Camunda BPM: Orquestração e gestão dos processos de restauro. APIs e IoT: Comunicação com sensores reais ou simulados. Base de Dados (Charter of Turin Monitor): Registo e histórico do restauro. Fluxo de Dados Sensores e operadores enviam dados. API processa e envia para a aplicação Unity. Unity atualiza a simulação em tempo real. Camunda gere a lógica do workflow e etapas do restauro. Foco da Documentação Esta documentação não cobre a API interna de Unity (por motivos técnicos), mas descreve: Como correr e usar a aplicação. Como os dados são processados e visualizados. Como adaptar ou expandir o sistema."
+  },
+  "getting-started.html": {
+    "href": "getting-started.html",
+    "title": "Como utilizar o ShopFloor Digital Twin | Digital Twin - Classic Cars Restoration",
+    "summary": "Como utilizar o ShopFloor Digital Twin Pré-requisitos Unity instalado (versão compatível com o projeto). Base de dados configurada (Charter of Turin Monitor). API configurada e em execução. Iniciar a aplicação Abrir o projeto Unity. Configurar as credenciais/API se necessário. Executar a simulação. Explorar a Oficina Virtual Navegar livremente pelo espaço 3D. Consultar a Timeline para ver as fases do restauro. Validar posições e processos dos veículos. Notas Bugs e problemas conhecidos estão a ser resolvidos."
+  },
+  "index.html": {
+    "href": "index.html",
+    "title": "Digital Twin para Restauro de Carros Clássicos | Digital Twin - Classic Cars Restoration",
+    "summary": "Digital Twin para Restauro de Carros Clássicos Bem-vindo à documentação oficial do projeto ShopFloor Digital Twin. Esta aplicação foi desenvolvida com o objetivo de criar um gémeo digital de uma oficina de restauro de carros clássicos, permitindo: Visualização em tempo real do estado de restauro. Simulação e planeamento de processos. Monitorização remota por parte dos proprietários e stakeholders. Esta documentação destina-se a programadores, investigadores e utilizadores que queiram compreender e colaborar com o projeto. Estrutura da documentação Introdução e Arquitetura Guia de utilização"
+  },
+  "introduction.html": {
+    "href": "introduction.html",
+    "title": "Introdução e Arquitetura | Digital Twin - Classic Cars Restoration",
+    "summary": "Introdução e Arquitetura O ShopFloor Digital Twin replica virtualmente uma oficina de restauro de carros clássicos, com foco na monitorização e documentação do processo. Objetivos Representar no espaço virtual a oficina e os veículos. Sincronizar dados de sensores IoT com o ambiente virtual. Demonstrar em tempo real o progresso do restauro. Arquitetura do Sistema Componentes principais: Unity 3D: Motor de visualização e simulação do ambiente da oficina e dos carros. Camunda BPM: Orquestração e gestão dos processos de restauro. APIs e IoT: Comunicação com sensores reais ou simulados. Base de Dados (Charter of Turin Monitor): Registo e histórico do restauro. Fluxo de Dados Sensores e operadores enviam dados. API processa e envia para a aplicação Unity. Unity atualiza a simulação em tempo real. Camunda gere a lógica do workflow e etapas do restauro. Foco da Documentação Esta documentação não cobre a API interna de Unity (por motivos técnicos), mas descreve: Como correr e usar a aplicação. Como os dados são processados e visualizados. Como adaptar ou expandir o sistema."
+  }
+}
