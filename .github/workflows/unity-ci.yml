@@ -1,64 +1,73 @@
-name: Unity CI (testes e/ou build)
+name: Unity CI (com testes e build)
 
 on:
   push:
     branches: [ main, master ]
-
+  pull_request:
+  workflow_dispatch:
 
 env:
   UNITY_VERSION: 2022.3.13f1
   PROJECT_PATH: .  
-      
+
 jobs:
   unity-job:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4.2.1 # Checkout
+      # 1. Checkout
+      - uses: actions/checkout@v4.2.1
 
-    # Cache da Library para acelerar re‑runs
-    - name: Cache Library
-      uses: actions/cache@v4.2.3
-      with:
-        path: ${{ env.PROJECT_PATH }}/Library
-        key:  Library-${{ env.UNITY_VERSION }}-${{ hashFiles('**/Packages/manifest.json') }}
-        restore-keys: |
-          Library-${{ env.UNITY_VERSION }}-
-          Library-
+      # 2. Cache da Library
+      - name: Cache Library
+        uses: actions/cache@v4.2.3
+        with:
+          path: ${{ env.PROJECT_PATH }}/Library
+          key: Library-${{ env.UNITY_VERSION }}-${{ hashFiles('**/Packages/manifest.json') }}
+          restore-keys: |
+            Library-${{ env.UNITY_VERSION }}-
+            Library-
 
-    
-    # Instala o Editor Unity
-    - name: Install Unity
-      uses: game-ci/unity-builder@v4
-      with:
-        unityVersion: ${{ env.UNITY_VERSION }}
-        projectPath: ${{ env.PROJECT_PATH }}
-        targetPlatform: StandaloneWindows64 
+      # 3. Ativar licença Unity (Student)
+      - name: Activate Student License
+        uses: game-ci/unity-activate@v2
+        with:
+          unityVersion: ${{ env.UNITY_VERSION }}
+        env:
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
 
-    # Ativa a licença Unity 
-    - name: Activate Student License
-      uses: game-ci/unity-activate@v2
-      with:
-        unityVersion: ${{ env.UNITY_VERSION }}
-      env:
-        UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+      # 4. Executar testes (PlayMode)
+      - name: Run PlayMode Tests
+        id: tests
+        uses: game-ci/unity-test-runner@v4
+        with:
+          unityVersion: ${{ env.UNITY_VERSION }}
+          projectPath: ${{ env.PROJECT_PATH }}
+          testMode: playmode
+          artifactsPath: TestResults
+        env:
+          UPM_REGISTRY_ENABLE_HTTP: "1"
 
-    #  Executa os testes (PlayMode)
-    - name: Run PlayMode Tests
-      id: tests
-      uses: game-ci/unity-test-runner@v4
-      with:
-        unityVersion: ${{ env.UNITY_VERSION }}
-        projectPath: ${{ env.PROJECT_PATH }}
-        testMode: playmode              
-        artifactsPath: TestResults
-   
+      # 5. Upload dos resultados dos testes
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: Unity-PlayMode-Tests
+          path: ${{ steps.tests.outputs.artifactsPath }}
 
-    # Relatórios
-    - name: Upload test results
-      uses: actions/upload-artifact@v4
-      with:
-        name: Unity-PlayMode-Tests
-        path: ${{ steps.tests.outputs.artifactsPath }}
+      # 6. Fazer build (Windows 64-bit)
+      - name: Build Project (StandaloneWindows64)
+        uses: game-ci/unity-builder@v4
+        with:
+          unityVersion: ${{ env.UNITY_VERSION }}
+          projectPath: ${{ env.PROJECT_PATH }}
+          targetPlatform: StandaloneWindows64
+        env:
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
 
- 
+      # 7. Guardar build como artefacto
+      - name: Upload Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: UnityBuild-Windows
+          path: build/StandaloneWindows64
