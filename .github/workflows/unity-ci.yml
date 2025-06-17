@@ -58,10 +58,8 @@ jobs:
           unityVersion: ${{ env.UNITY_VERSION }}
           targetPlatform: StandaloneWindows64
           allowDirtyBuild: true
-          buildName: MyBuild
+          buildName: MyGameBuild
 
-      # Adicionado para depuração: Lista todos os ficheiros no diretório de trabalho.
-      # Isto ajuda a ver se a build foi criada e onde.
       - name: List Files in Workspace
         if: always()
         run: ls -R
@@ -70,4 +68,4 @@ jobs:
         uses: actions/upload-artifact@v4.6.2
         with:
           name: UnityBuild-Windows
-          path: ${{ steps.build.outputs.buildPath }}
+          path: build/StandaloneWindows64
