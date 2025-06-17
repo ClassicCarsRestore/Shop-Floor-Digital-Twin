@@ -57,6 +57,7 @@ jobs:
           projectPath: ${{ env.PROJECT_PATH }}
           unityVersion: ${{ env.UNITY_VERSION }}
           targetPlatform: StandaloneWindows64
+          allowDirtyBuild: true
 
       - name: Upload Build
         uses: actions/upload-artifact@v4.6.2
