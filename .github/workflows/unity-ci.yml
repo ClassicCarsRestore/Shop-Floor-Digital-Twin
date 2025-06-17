@@ -8,58 +8,58 @@ on:
 
 env:
   UNITY_VERSION: 2022.3.13f1
-  PROJECT_PATH: .  
+  PROJECT_PATH: .
 
 jobs:
   unity-job:
     runs-on: ubuntu-latest
-
     steps:
-      # 1. Checkout
-      - uses: actions/checkout@v4.2.1
+      - name: Checkout project
+        uses: actions/checkout@v4.2.1
 
-      # 2. Cache da Library
       - name: Cache Library
         uses: actions/cache@v4.2.3
         with:
           path: ${{ env.PROJECT_PATH }}/Library
-          key: Library-${{ env.UNITY_VERSION }}-${{ hashFiles('**/Packages/manifest.json') }}
+          key: Library-${{ env.PROJECT_PATH }}-${{ env.UNITY_VERSION }}-${{ hashFiles('**/Packages/manifest.json') }}
           restore-keys: |
-            Library-${{ env.UNITY_VERSION }}-
+            Library-${{ env.PROJECT_PATH }}-${{ env.UNITY_VERSION }}-
             Library-
 
-      # 4. Executar testes (PlayMode)
       - name: Run PlayMode Tests
         id: tests
-        uses: game-ci/unity-test-runner@v4
+        uses: game-ci/unity-test-runner@v4.3.1
+        env:
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
-          unityVersion: ${{ env.UNITY_VERSION }}
           projectPath: ${{ env.PROJECT_PATH }}
+          unityVersion: ${{ env.UNITY_VERSION }}
           testMode: playmode
           artifactsPath: TestResults
-        env:
-          UPM_REGISTRY_ENABLE_HTTP: "1"
 
-      # 5. Upload dos resultados dos testes
       - name: Upload Test Results
-        uses: actions/upload-artifact@v4
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: Unity-PlayMode-Tests
           path: ${{ steps.tests.outputs.artifactsPath }}
 
-      # 6. Fazer build (Windows 64-bit)
       - name: Build Project (StandaloneWindows64)
-        uses: game-ci/unity-builder@v4
-        with:
-          unityVersion: ${{ env.UNITY_VERSION }}
-          projectPath: ${{ env.PROJECT_PATH }}
-          targetPlatform: StandaloneWindows64-mono
+        id: build
+        uses: game-ci/unity-builder@v4.5.0
         env:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: ${{ env.PROJECT_PATH }}
+          unityVersion: ${{ env.UNITY_VERSION }}
+          targetPlatform: StandaloneWindows64
 
-      # 7. Guardar build como artefacto
       - name: Upload Build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: UnityBuild-Windows
-          path: build/StandaloneWindows64
+          path: ${{ steps.build.outputs.buildPath }}
