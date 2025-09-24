@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CoverageReport scope="Summary">
+  <Summary>
+    <Generatedon>19/06/2025 - 23:06:00</Generatedon>
+    <Parser>MultiReportParser (9x OpenCoverParser)</Parser>
+    <Assemblies>5</Assemblies>
+    <Classes>39</Classes>
+    <Files>39</Files>
+    <Coveredlines>286</Coveredlines>
+    <Uncoveredlines>2997</Uncoveredlines>
+    <Coverablelines>3283</Coverablelines>
+    <Totallines>8598</Totallines>
+    <Linecoverage>8.7</Linecoverage>
+    <Coveredbranches>0</Coveredbranches>
+    <Totalbranches>0</Totalbranches>
+    <Coveredmethods>21</Coveredmethods>
+    <Totalmethods>400</Totalmethods>
+    <Methodcoverage>5.2</Methodcoverage>
+  </Summary>
+  <Coverage>
+    <Assembly name="API.Runtime" classes="2" coverage="42.2" coveredlines="131" coverablelines="310" totallines="1030" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="9" totalmethods="21" methodcoverage="42.8">
+      <Class name="API.APIscript" coverage="47.2" coveredlines="131" coverablelines="277" totallines="932" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="9" totalmethods="17" methodcoverage="52.9" />
+      <Class name="API.CamundaAPIscript" coverage="0" coveredlines="0" coverablelines="33" totallines="98" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="4" methodcoverage="0" />
+    </Assembly>
+    <Assembly name="Assembly-CSharp" classes="33" coverage="0" coveredlines="0" coverablelines="2691" totallines="6466" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="353" methodcoverage="0">
+      <Class name="HighlightAndSelection" coverage="0" coveredlines="0" coverablelines="65" totallines="167" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="9" methodcoverage="0" />
+      <Class name="Objects.AccordionItem" coverage="0" coveredlines="0" coverablelines="40" totallines="97" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="5" methodcoverage="0" />
+      <Class name="Objects.CameraSystem" coverage="0" coveredlines="0" coverablelines="82" totallines="179" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="13" methodcoverage="0" />
+      <Class name="Objects.CarHover" coverage="0" coveredlines="0" coverablelines="2" totallines="21" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="1" methodcoverage="0" />
+      <Class name="Objects.CarObject" coverage="0" coveredlines="0" coverablelines="126" totallines="341" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="14" methodcoverage="0" />
+      <Class name="Objects.CarSlotMeshCreator" coverage="0" coveredlines="0" coverablelines="56" totallines="171" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="5" methodcoverage="0" />
+      <Class name="Objects.CarSlotObject" coverage="0" coveredlines="0" coverablelines="46" totallines="139" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="11" methodcoverage="0" />
+      <Class name="Objects.ColorPickerCar" coverage="0" coveredlines="0" coverablelines="15" totallines="54" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="5" methodcoverage="0" />
+      <Class name="Objects.ColorPickerLocation" coverage="0" coveredlines="0" coverablelines="18" totallines="58" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="6" methodcoverage="0" />
+      <Class name="Objects.CreatePolygon" coverage="0" coveredlines="0" coverablelines="24" totallines="74" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="5" methodcoverage="0" />
+      <Class name="Objects.Roof" coverage="0" coveredlines="0" coverablelines="18" totallines="65" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="6" methodcoverage="0" />
+      <Class name="Objects.SliderScript" coverage="0" coveredlines="0" coverablelines="9" totallines="35" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="1" methodcoverage="0" />
+      <Class name="Objects.VertexDragger" coverage="0" coveredlines="0" coverablelines="23" totallines="73" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="5" methodcoverage="0" />
+      <Class name="Outline" coverage="0" coveredlines="0" coverablelines="111" totallines="309" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="19" methodcoverage="0" />
+      <Class name="ProjectsList" coverage="0" coveredlines="0" coverablelines="355" totallines="731" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="29" methodcoverage="0" />
+      <Class name="TS.ColorPicker.ColorPicker" coverage="0" coveredlines="0" coverablelines="78" totallines="195" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="21" methodcoverage="0" />
+      <Class name="TS.ColorPicker.ColorSlider" coverage="0" coveredlines="0" coverablelines="14" totallines="58" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="6" methodcoverage="0" />
+      <Class name="TS.ColorPicker.HsbPicker" coverage="0" coveredlines="0" coverablelines="23" totallines="73" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="10" methodcoverage="0" />
+      <Class name="TS.ColorPicker.InputChannel" coverage="0" coveredlines="0" coverablelines="11" totallines="49" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="8" methodcoverage="0" />
+      <Class name="TS.ColorPicker.InputColorChannels" coverage="0" coveredlines="0" coverablelines="8" totallines="41" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="3" methodcoverage="0" />
+      <Class name="TS.ColorPicker.InputHex" coverage="0" coveredlines="0" coverablelines="11" totallines="50" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="6" methodcoverage="0" />
+      <Class name="TS.ColorPicker.PointerTrackerArea" coverage="0" coveredlines="0" coverablelines="16" totallines="64" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="6" methodcoverage="0" />
+      <Class name="TS.ColorPicker.RectPicker" coverage="0" coveredlines="0" coverablelines="10" totallines="46" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="6" methodcoverage="0" />
+      <Class name="UI.AddCar" coverage="0" coveredlines="0" coverablelines="28" totallines="73" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="3" methodcoverage="0" />
+      <Class name="UI.CarInfoDetailPanel" coverage="0" coveredlines="0" coverablelines="221" totallines="513" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="19" methodcoverage="0" />
+      <Class name="UI.CarSlotCreator" coverage="0" coveredlines="0" coverablelines="201" totallines="404" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="19" methodcoverage="0" />
+      <Class name="UI.CarTimelineController" coverage="0" coveredlines="0" coverablelines="344" totallines="748" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="26" methodcoverage="0" />
+      <Class name="UI.Login" coverage="0" coveredlines="0" coverablelines="51" totallines="146" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="9" methodcoverage="0" />
+      <Class name="UI.Logout" coverage="0" coveredlines="0" coverablelines="13" totallines="46" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="4" methodcoverage="0" />
+      <Class name="UI.ProcessesAndActivitiesList" coverage="0" coveredlines="0" coverablelines="42" totallines="110" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="9" methodcoverage="0" />
+      <Class name="UI.UIManager" coverage="0" coveredlines="0" coverablelines="63" totallines="153" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="12" methodcoverage="0" />
+      <Class name="UI.UpdateCarLocationInTask" coverage="0" coveredlines="0" coverablelines="253" totallines="523" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="22" methodcoverage="0" />
+      <Class name="UI.VirtualMapScrollView" coverage="0" coveredlines="0" coverablelines="314" totallines="660" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="30" methodcoverage="0" />
+    </Assembly>
+    <Assembly name="Assembly-CSharp-Editor" classes="1" coverage="0" coveredlines="0" coverablelines="98" totallines="710" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="7" methodcoverage="0">
+      <Class name="Hbx.WebGL.WebGLRetinaToolsLite" coverage="0" coveredlines="0" coverablelines="98" totallines="710" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="7" methodcoverage="0" />
+    </Assembly>
+    <Assembly name="Models.Runtime" classes="2" coverage="0" coveredlines="0" coverablelines="19" totallines="68" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="6" methodcoverage="0">
+      <Class name="Models.CameraSwitcher" coverage="0" coveredlines="0" coverablelines="13" totallines="44" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="5" methodcoverage="0" />
+      <Class name="Models.CarPosition" coverage="0" coveredlines="0" coverablelines="6" totallines="24" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="0" totalmethods="1" methodcoverage="0" />
+    </Assembly>
+    <Assembly name="PlayMode" classes="1" coverage="93.9" coveredlines="155" coverablelines="165" totallines="324" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="12" totalmethods="13" methodcoverage="92.3">
+      <Class name="Tests.APITestPM" coverage="93.9" coveredlines="155" coverablelines="165" totallines="324" branchcoverage="" coveredbranches="0" totalbranches="0" coveredmethods="12" totalmethods="13" methodcoverage="92.3" />
+    </Assembly>
+  </Coverage>
+</CoverageReport>

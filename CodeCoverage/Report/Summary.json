@@ -1,0 +1,66 @@
+{
+  "summary": {
+    "generatedon": "2025-06-19T22:06:00Z",
+    "parser": "MultiReportParser (9x OpenCoverParser)",
+    "assemblies": 5,
+    "classes": 39,
+    "files": 39,
+    "coveredlines": 286,
+    "uncoveredlines": 2997,
+    "coverablelines": 3283,
+    "totallines": 8598,
+    "linecoverage": 8.7,
+    "coveredbranches": 0,
+    "totalbranches": 0,
+    "coveredmethods": 21,
+    "totalmethods": 400,
+    "methodcoverage": 5.2
+ },
+  "coverage": {
+    "assemblies": [
+      { "name": "API.Runtime", "classes": 2, "coverage": 42.2, "coveredlines": 131, "coverablelines": 310, "totallines": 1030, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 42.8, "coveredmethods": 9, "totalmethods": 21, "classesinassembly": [
+        { "name": "API.APIscript", "coverage": 47.2, "coveredlines": 131, "coverablelines": 277, "totallines": 932, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 52.9, "coveredmethods": 9, "totalmethods": 17 },
+        { "name": "API.CamundaAPIscript", "coverage": 0, "coveredlines": 0, "coverablelines": 33, "totallines": 98, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 4 } ] },
+      { "name": "Assembly-CSharp", "classes": 33, "coverage": 0, "coveredlines": 0, "coverablelines": 2691, "totallines": 6466, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 353, "classesinassembly": [
+        { "name": "HighlightAndSelection", "coverage": 0, "coveredlines": 0, "coverablelines": 65, "totallines": 167, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 9 },
+        { "name": "Objects.AccordionItem", "coverage": 0, "coveredlines": 0, "coverablelines": 40, "totallines": 97, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 5 },
+        { "name": "Objects.CameraSystem", "coverage": 0, "coveredlines": 0, "coverablelines": 82, "totallines": 179, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 13 },
+        { "name": "Objects.CarHover", "coverage": 0, "coveredlines": 0, "coverablelines": 2, "totallines": 21, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 1 },
+        { "name": "Objects.CarObject", "coverage": 0, "coveredlines": 0, "coverablelines": 126, "totallines": 341, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 14 },
+        { "name": "Objects.CarSlotMeshCreator", "coverage": 0, "coveredlines": 0, "coverablelines": 56, "totallines": 171, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 5 },
+        { "name": "Objects.CarSlotObject", "coverage": 0, "coveredlines": 0, "coverablelines": 46, "totallines": 139, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 11 },
+        { "name": "Objects.ColorPickerCar", "coverage": 0, "coveredlines": 0, "coverablelines": 15, "totallines": 54, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 5 },
+        { "name": "Objects.ColorPickerLocation", "coverage": 0, "coveredlines": 0, "coverablelines": 18, "totallines": 58, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 6 },
+        { "name": "Objects.CreatePolygon", "coverage": 0, "coveredlines": 0, "coverablelines": 24, "totallines": 74, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 5 },
+        { "name": "Objects.Roof", "coverage": 0, "coveredlines": 0, "coverablelines": 18, "totallines": 65, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 6 },
+        { "name": "Objects.SliderScript", "coverage": 0, "coveredlines": 0, "coverablelines": 9, "totallines": 35, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 1 },
+        { "name": "Objects.VertexDragger", "coverage": 0, "coveredlines": 0, "coverablelines": 23, "totallines": 73, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 5 },
+        { "name": "Outline", "coverage": 0, "coveredlines": 0, "coverablelines": 111, "totallines": 309, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 19 },
+        { "name": "ProjectsList", "coverage": 0, "coveredlines": 0, "coverablelines": 355, "totallines": 731, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 29 },
+        { "name": "TS.ColorPicker.ColorPicker", "coverage": 0, "coveredlines": 0, "coverablelines": 78, "totallines": 195, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 21 },
+        { "name": "TS.ColorPicker.ColorSlider", "coverage": 0, "coveredlines": 0, "coverablelines": 14, "totallines": 58, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 6 },
+        { "name": "TS.ColorPicker.HsbPicker", "coverage": 0, "coveredlines": 0, "coverablelines": 23, "totallines": 73, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 10 },
+        { "name": "TS.ColorPicker.InputChannel", "coverage": 0, "coveredlines": 0, "coverablelines": 11, "totallines": 49, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 8 },
+        { "name": "TS.ColorPicker.InputColorChannels", "coverage": 0, "coveredlines": 0, "coverablelines": 8, "totallines": 41, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 3 },
+        { "name": "TS.ColorPicker.InputHex", "coverage": 0, "coveredlines": 0, "coverablelines": 11, "totallines": 50, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 6 },
+        { "name": "TS.ColorPicker.PointerTrackerArea", "coverage": 0, "coveredlines": 0, "coverablelines": 16, "totallines": 64, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 6 },
+        { "name": "TS.ColorPicker.RectPicker", "coverage": 0, "coveredlines": 0, "coverablelines": 10, "totallines": 46, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 6 },
+        { "name": "UI.AddCar", "coverage": 0, "coveredlines": 0, "coverablelines": 28, "totallines": 73, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 3 },
+        { "name": "UI.CarInfoDetailPanel", "coverage": 0, "coveredlines": 0, "coverablelines": 221, "totallines": 513, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 19 },
+        { "name": "UI.CarSlotCreator", "coverage": 0, "coveredlines": 0, "coverablelines": 201, "totallines": 404, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 19 },
+        { "name": "UI.CarTimelineController", "coverage": 0, "coveredlines": 0, "coverablelines": 344, "totallines": 748, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 26 },
+        { "name": "UI.Login", "coverage": 0, "coveredlines": 0, "coverablelines": 51, "totallines": 146, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 9 },
+        { "name": "UI.Logout", "coverage": 0, "coveredlines": 0, "coverablelines": 13, "totallines": 46, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 4 },
+        { "name": "UI.ProcessesAndActivitiesList", "coverage": 0, "coveredlines": 0, "coverablelines": 42, "totallines": 110, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 9 },
+        { "name": "UI.UIManager", "coverage": 0, "coveredlines": 0, "coverablelines": 63, "totallines": 153, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 12 },
+        { "name": "UI.UpdateCarLocationInTask", "coverage": 0, "coveredlines": 0, "coverablelines": 253, "totallines": 523, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 22 },
+        { "name": "UI.VirtualMapScrollView", "coverage": 0, "coveredlines": 0, "coverablelines": 314, "totallines": 660, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 30 } ] },
+      { "name": "Assembly-CSharp-Editor", "classes": 1, "coverage": 0, "coveredlines": 0, "coverablelines": 98, "totallines": 710, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 7, "classesinassembly": [
+        { "name": "Hbx.WebGL.WebGLRetinaToolsLite", "coverage": 0, "coveredlines": 0, "coverablelines": 98, "totallines": 710, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 7 } ] },
+      { "name": "Models.Runtime", "classes": 2, "coverage": 0, "coveredlines": 0, "coverablelines": 19, "totallines": 68, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 6, "classesinassembly": [
+        { "name": "Models.CameraSwitcher", "coverage": 0, "coveredlines": 0, "coverablelines": 13, "totallines": 44, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 5 },
+        { "name": "Models.CarPosition", "coverage": 0, "coveredlines": 0, "coverablelines": 6, "totallines": 24, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 0, "coveredmethods": 0, "totalmethods": 1 } ] },
+      { "name": "PlayMode", "classes": 1, "coverage": 93.9, "coveredlines": 155, "coverablelines": 165, "totallines": 324, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 92.3, "coveredmethods": 12, "totalmethods": 13, "classesinassembly": [
+        { "name": "Tests.APITestPM", "coverage": 93.9, "coveredlines": 155, "coverablelines": 165, "totallines": 324, "branchcoverage": null, "coveredbranches": 0, "totalbranches": 0, "methodcoverage": 92.3, "coveredmethods": 12, "totalmethods": 13 } ] } ]
+  }
+}
