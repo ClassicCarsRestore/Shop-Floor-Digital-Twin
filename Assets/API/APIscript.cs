@@ -16,8 +16,8 @@ namespace API
         public const string MANAGER = "manager";
         public const string OWNER = "owner";
 
-        // antes: private const string apiUrl = "http://194.210.120.34:5000/api";
-        private const string apiUrl = "/api";
+         private const string apiUrl = "http://194.210.120.34:5000/api";
+        //private const string apiUrl = "/api";
         private string role;
         private string securityToken;
         public string lastCarLocation;
@@ -31,6 +31,8 @@ namespace API
         public CamundaTaskDto camundaTask;
         public TaskDTO task;
         public List<string> locationIds;
+        public List<TaskDTO> tasks;   // <--- NOVO
+
 
         public UnityWebRequest.Result lastResponseResult;
 
@@ -798,6 +800,50 @@ namespace API
                 CamundaActivityRetrieved?.Invoke(null);
             }
         }
+
+        public async Task GetTasksAsync()
+        {
+            Debug.Log("Fetching tasks...");
+            string url = $"{apiUrl}/Tasks";
+
+            UnityWebRequest request = UnityWebRequest.Get(url);
+
+            if (!string.IsNullOrEmpty(securityToken))
+            {
+                request.SetRequestHeader("Authorization", "Bearer " + securityToken);
+            }
+
+            request.downloadHandler = new DownloadHandlerBuffer();
+
+            var tcs = new TaskCompletionSource<bool>();
+            var asyncOperation = request.SendWebRequest();
+            asyncOperation.completed += _ => tcs.SetResult(true);
+            await tcs.Task;
+
+            if (request.result == UnityWebRequest.Result.Success)
+            {
+                try
+                {
+                    tasks = JsonConvert.DeserializeObject<List<TaskDTO>>(request.downloadHandler.text);
+                    Debug.Log($"Tasks retrieved successfully. Count = {tasks?.Count ?? 0}");
+                }
+                catch (JsonReaderException ex)
+                {
+                    Debug.LogError("JSON parsing error (tasks): " + ex.Message);
+                    Debug.LogError("Response content: " + request.downloadHandler.text);
+                    tasks = null;
+                }
+            }
+            else
+            {
+                Debug.LogError("Get Tasks failed: " + request.error);
+                Debug.LogError("Response content: " + request.downloadHandler.text);
+                tasks = null;
+            }
+
+            lastResponseResult = request.result;
+        }
+
 
         /// <summary>
         /// Delegate triggered when a specific task is retrieved from the backend.

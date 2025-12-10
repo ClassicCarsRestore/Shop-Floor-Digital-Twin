@@ -60,11 +60,17 @@
     <Analyzer Include="C:\Program Files\Unity\Hub\Editor\2022.3.13f1\Editor\Data\Tools\Unity.SourceGenerators\Unity.Properties.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets\LegendItemUI.cs" />
+    <Compile Include="Assets\HeatmapTooltipUI.cs" />
+    <Compile Include="Assets\HeatmapButtonLauncher.cs" />
     <Compile Include="Assets\UI\AddCar.cs" />
     <Compile Include="Assets\Objects\CarSlotObject.cs" />
     <Compile Include="Assets\Objects\CarSlotMeshCreator.cs" />
+    <Compile Include="Assets\HeatmapZoneTag.cs" />
     <Compile Include="Assets\UI\ProjectsList.cs" />
     <Compile Include="Assets\UI\CarInfoDetailPanel.cs" />
+    <Compile Include="Assets\SimpleDatePicker.cs" />
+    <Compile Include="Assets\LegendManager.cs" />
     <Compile Include="Assets\Objects\SliderScript.cs" />
     <Compile Include="Assets\ColorPicker\Scripts\HsbPicker.cs" />
     <Compile Include="Assets\UI\UpdateCarLocationInTask.cs" />
@@ -75,13 +81,16 @@
     <Compile Include="Assets\ColorPicker\Scripts\ColorSlider.cs" />
     <Compile Include="Assets\QuickOutline\Scripts\Outline.cs" />
     <Compile Include="Assets\Objects\CarHover.cs" />
+    <Compile Include="Assets\HeatmapHUDController.cs" />
     <Compile Include="Assets\UI\CarSlotCreator.cs" />
     <Compile Include="Assets\UI\UIManager.cs" />
     <Compile Include="Assets\Objects\CarObject.cs" />
     <Compile Include="Assets\UI\CarTimelineController.cs" />
+    <Compile Include="Assets\HeatmapModeController.cs" />
     <Compile Include="Assets\Objects\HighlightAndSelection.cs" />
     <Compile Include="Assets\UI\VirtualMapScrollView.cs" />
     <Compile Include="Assets\Objects\CameraSystem.cs" />
+    <Compile Include="Assets\UI\StepMarkerManager.cs" />
     <Compile Include="Assets\Objects\CreatePolygon.cs" />
     <Compile Include="Assets\Objects\AccordionItem.cs" />
     <Compile Include="Assets\ColorPicker\Scripts\RectPicker.cs" />
