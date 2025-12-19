@@ -111,38 +111,44 @@ public class WarehouseManager : MonoBehaviour
             }
         }
     }
-    [ContextMenu("Test Spawn Random Boxes")]
-    private void TestSpawnRandom()
+    [ContextMenu("Test Spawn Boxes")]
+    private void TestSpawn()
     {
-        const int totalSections = 10; // tens 10 sections
-        const int shelvesPerSection = 3;  // 3 prateleiras
-        const int areasPerShelf = 4;  // 4 áreas
-
-        int boxCount = 20; // podes mudar este número se quiseres mais/menos caixas
-
-        var locations = new List<StorageLocationDTO>();
-        var used = new HashSet<string>(); // para não repetir a mesma slot
-
-        while (locations.Count < boxCount)
+        var locations = new List<StorageLocationDTO>
+    {
+        new StorageLocationDTO
         {
-            int section = Random.Range(1, totalSections + 1);      // 1..10
-            int shelf = Random.Range(1, shelvesPerSection + 1);  // 1..3
-            int area = Random.Range(1, areasPerShelf + 1);      // 1..4
-
-            string key = $"{section}-{shelf}-{area}";
-            if (used.Contains(key))
-                continue; // já existe uma caixa nesta slot, tenta outra
-
-            used.Add(key);
-
-            locations.Add(new StorageLocationDTO
-            {
-                section = section.ToString(),
-                shelf = shelf.ToString(),
-                area = area.ToString()
-            });
+            section = "1",
+            shelf = "1",
+            area  = "1"
+        },
+        new StorageLocationDTO
+        {
+            section = "5",
+            shelf = "2",
+            area  = "2"
+        },
+        new StorageLocationDTO
+        {
+            section = "8",
+            shelf = "3",
+            area  = "1"
+        },
+        new StorageLocationDTO
+        {
+            section = "4",
+            shelf = "1",
+            area  = "2"
+        },
+         new StorageLocationDTO
+        {
+            section = "2",
+            shelf = "1",
+            area  = "3"
         }
+    };
 
+        
         ShowStorageForCar("TEST_CAR", locations);
     }
 

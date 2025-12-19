@@ -25,7 +25,7 @@ public class StorageBox : MonoBehaviour
     {
         if (boxRenderer == null || originalMaterial == null) return;
 
-        // Por agora só muda a cor para testar
+        
         if (on)
         {
             boxRenderer.material.color = Color.yellow;
