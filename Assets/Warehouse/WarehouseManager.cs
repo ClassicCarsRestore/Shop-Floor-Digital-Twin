@@ -11,6 +11,11 @@ public class WarehouseManager : MonoBehaviour
     [Header("Prefabs")]
     public GameObject storageBoxPrefab;
 
+    // Guarda caixas instanciadas por localização (sec-shelf-area)
+    private readonly Dictionary<string, StorageBox> boxesByLocation = new Dictionary<string, StorageBox>();
+
+    public Transform WarehouseRoot;
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -21,41 +26,197 @@ public class WarehouseManager : MonoBehaviour
         Instance = this;
     }
 
+    // ---------------------------
+    // PUBLIC API
+    // ---------------------------
+
+    /// <summary>
+    /// Mostra TODAS as caixas do armazém (todas as locations) sem highlight.
+    /// rows: lista com carId + location
+    /// </summary>
+    public void ShowAllStorage(List<StorageRowDTO> rows)
+    {
+        ClearAllBoxes();
+
+        if (rows == null) return;
+
+        foreach (var row in rows)
+        {
+            if (row == null || row.location == null) continue;
+
+            SpawnBoxAt(row.carId, row.location, highlight: false);
+        }
+    }
+
+    /// <summary>
+    /// Faz highlight apenas das caixas desse carro.
+    /// </summary>
+    public void HighlightCarBoxes(string carId, List<StorageRowDTO> rows)
+    {
+        if (string.IsNullOrEmpty(carId)) return;
+
+        // 1) desligar highlight de todas
+        SetAllHighlights(false);
+
+        if (rows == null) return;
+
+        // 2) ligar highlight só nas locations do carro
+        foreach (var row in rows)
+        {
+            if (row == null || row.location == null) continue;
+            if (row.carId != carId) continue;
+
+            string key = MakeKey(row.location.section, row.location.shelf, row.location.area);
+
+            if (boxesByLocation.TryGetValue(key, out var box) && box != null)
+            {
+                box.Highlight(true);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Helper: faz highlight a partir de uma lista de locations (sem precisar de rows).
+    /// Útil se o endpoint do carro devolver só location.
+    /// </summary>
+    public void HighlightCarBoxesByLocations(string carId, List<StorageLocationDTO> locations)
+    {
+        if (string.IsNullOrEmpty(carId)) return;
+
+        SetAllHighlights(false);
+
+        if (locations == null) return;
+
+        foreach (var loc in locations)
+        {
+            if (loc == null) continue;
+
+            string key = MakeKey(loc.section, loc.shelf, loc.area);
+
+            if (boxesByLocation.TryGetValue(key, out var box) && box != null)
+            {
+                // opcional: atualizar carId na box (se quiseres)
+                box.CarId = carId;
+                box.Highlight(true);
+            }
+        }
+    }
+
     /// <summary>
     /// Mostra a(s) caixa(s) para um carro específico nas localizações indicadas.
+    /// Serve para testes/uso antigo: ele limpa caixas desse carId e cria só as do carro (com highlight).
     /// </summary>
     public void ShowStorageForCar(string carId, List<StorageLocationDTO> locations)
     {
         // Limpa caixas antigas desse carro (se houver)
         ClearBoxesForCar(carId);
 
+        if (locations == null) return;
+
         foreach (var loc in locations)
         {
-            var area = FindArea(loc.section, loc.shelf, loc.area);
-            if (area == null)
+            if (loc == null) continue;
+
+            SpawnBoxAt(carId, loc, highlight: true);
+        }
+    }
+
+    public ShelfSection AddSectionRuntime(GameObject sectionGO)
+    {
+        if (sectionGO == null) return null;
+
+        // garantir parent
+        if (WarehouseRoot != null)
+            sectionGO.transform.SetParent(WarehouseRoot, true);
+
+        // garantir componente
+        var sec = sectionGO.GetComponent<ShelfSection>();
+        if (sec == null)
+        {
+            Debug.LogError("[WarehouseManager] sectionGO não tem ShelfSection no root.");
+            return null;
+        }
+
+        string newId = GetNextSectionIdString(Sections);
+
+        sec.SectionId = newId;
+        sectionGO.name = $"Section_{newId}";
+
+        if (!Sections.Contains(sec))
+            Sections.Add(sec);
+
+        return sec;
+    }
+
+    
+    private string GetNextSectionIdString(List<ShelfSection> sections)
+    {
+        int max = 0;
+
+        if (sections != null)
+        {
+            foreach (var s in sections)
             {
-                Debug.LogWarning($"[WarehouseManager] Não encontrei area: secção {loc.section}, prateleira {loc.shelf}, área {loc.area}");
-                continue;
-            }
+                if (s == null) continue;
+                if (string.IsNullOrEmpty(s.SectionId)) continue;
 
-            // Instanciar a caixa na posição do BoxAnchor
-            Transform anchor = area.BoxAnchor != null ? area.BoxAnchor : area.transform;
-
-            GameObject boxGO = Instantiate(
-                storageBoxPrefab,
-                anchor.position,
-                storageBoxPrefab.transform.rotation, 
-                area.transform
-            );
-
-
-            var boxComp = boxGO.GetComponent<StorageBox>();
-            if (boxComp != null)
-            {
-                boxComp.CarId = carId;
-                boxComp.Highlight(true);
+                if (int.TryParse(s.SectionId, out int val))
+                {
+                    if (val > max) max = val;
+                }
             }
         }
+
+        return (max + 1).ToString();
+    }
+
+
+    // ---------------------------
+    // INTERNALS
+    // ---------------------------
+
+    private void SpawnBoxAt(string carId, StorageLocationDTO loc, bool highlight)
+    {
+        var area = FindArea(loc.section, loc.shelf, loc.area);
+        if (area == null)
+        {
+            Debug.LogWarning($"[WarehouseManager] Não encontrei area: secção {loc.section}, prateleira {loc.shelf}, área {loc.area}");
+            return;
+        }
+
+        Transform anchor = area.BoxAnchor != null ? area.BoxAnchor : area.transform;
+
+        // Key única por localização
+        string key = MakeKey(loc.section, loc.shelf, loc.area);
+
+        // Se já existe uma caixa nessa location, destrói e substitui (evita duplicados)
+        if (boxesByLocation.TryGetValue(key, out var existing) && existing != null)
+        {
+            Destroy(existing.gameObject);
+            boxesByLocation.Remove(key);
+        }
+
+        GameObject boxGO = Instantiate(
+            storageBoxPrefab,
+            anchor.position,
+            storageBoxPrefab.transform.rotation,
+            area.transform
+        );
+
+        var boxComp = boxGO.GetComponent<StorageBox>();
+        if (boxComp != null)
+        {
+            boxComp.CarId = carId;
+            boxComp.LocationKey = key;
+            boxComp.Highlight(highlight);
+
+            boxesByLocation[key] = boxComp;
+        }
+    }
+
+    private string MakeKey(string section, string shelf, string area)
+    {
+        return $"{section}-{shelf}-{area}";
     }
 
     /// <summary>
@@ -98,59 +259,116 @@ public class WarehouseManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Remove todas as caixas daquele carro.
+    /// Remove todas as caixas desse carro.
     /// </summary>
     private void ClearBoxesForCar(string carId)
     {
-        var allBoxes = FindObjectsOfType<StorageBox>();
-        foreach (var box in allBoxes)
+        if (string.IsNullOrEmpty(carId)) return;
+
+        var keysToRemove = new List<string>();
+
+        foreach (var kv in boxesByLocation)
         {
-            if (box.CarId == carId)
+            var box = kv.Value;
+            if (box != null && box.CarId == carId)
             {
                 Destroy(box.gameObject);
+                keysToRemove.Add(kv.Key);
             }
         }
+
+        foreach (var key in keysToRemove)
+            boxesByLocation.Remove(key);
     }
-    [ContextMenu("Test Spawn Boxes")]
-    private void TestSpawn()
+
+    /// <summary>
+    /// Remove todas as caixas do armazém.
+    /// </summary>
+    public void ClearAllBoxes()
     {
-        var locations = new List<StorageLocationDTO>
-    {
-        new StorageLocationDTO
+        foreach (var kv in boxesByLocation)
         {
-            section = "1",
-            shelf = "1",
-            area  = "1"
-        },
-        new StorageLocationDTO
-        {
-            section = "5",
-            shelf = "2",
-            area  = "2"
-        },
-        new StorageLocationDTO
-        {
-            section = "8",
-            shelf = "3",
-            area  = "1"
-        },
-        new StorageLocationDTO
-        {
-            section = "4",
-            shelf = "1",
-            area  = "2"
-        },
-         new StorageLocationDTO
-        {
-            section = "2",
-            shelf = "1",
-            area  = "3"
+            if (kv.Value != null)
+                Destroy(kv.Value.gameObject);
         }
-    };
-
-        
-        ShowStorageForCar("TEST_CAR", locations);
+        boxesByLocation.Clear();
     }
 
+    private void SetAllHighlights(bool on)
+    {
+        foreach (var kv in boxesByLocation)
+        {
+            if (kv.Value != null)
+                kv.Value.Highlight(on);
+        }
+    }
 
+    // ---------------------------
+    // TESTS (sem BD)
+    // ---------------------------
+
+    [ContextMenu("Test Spawn ALL Boxes (Mock Rows)")]
+    private void TestSpawnAll()
+    {
+        // Exemplo simples: 10 sections, 3 shelves, 4 areas
+        var rows = new List<StorageRowDTO>();
+        string[] cars = { "CAR_A", "CAR_B", "CAR_C" };
+
+        for (int s = 1; s <= 10; s++)
+        {
+            for (int sh = 1; sh <= 3; sh++)
+            {
+                for (int a = 1; a <= 4; a++)
+                {
+                    rows.Add(new StorageRowDTO
+                    {
+                        carId = cars[Random.Range(0, cars.Length)],
+                        location = new StorageLocationDTO
+                        {
+                            section = s.ToString(),
+                            shelf = sh.ToString(),
+                            area = a.ToString()
+                        }
+                    });
+                }
+            }
+        }
+
+        ShowAllStorage(rows);
+    }
+
+    [ContextMenu("Test Highlight CAR_A (Mock Rows)")]
+    private void TestHighlightCarA()
+    {
+        // Se ainda não houver caixas, cria mock completo
+        if (boxesByLocation.Count == 0)
+            TestSpawnAll();
+
+        // Mock só do CAR_A (para simular endpoint do carro)
+        var carRows = new List<StorageRowDTO>();
+        foreach (var kv in boxesByLocation)
+        {
+            if (kv.Value != null && kv.Value.CarId == "CAR_A")
+            {
+                // reconstruir location a partir da key
+                // key = "section-shelf-area"
+                var parts = kv.Key.Split('-');
+                if (parts.Length == 3)
+                {
+                    carRows.Add(new StorageRowDTO
+                    {
+                        carId = "CAR_A",
+                        location = new StorageLocationDTO
+                        {
+                            section = parts[0],
+                            shelf = parts[1],
+                            area = parts[2]
+                        }
+                    });
+                }
+            }
+        }
+
+        HighlightCarBoxes("CAR_A", carRows);
+    }
 }

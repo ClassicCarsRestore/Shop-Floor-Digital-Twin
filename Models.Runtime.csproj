@@ -63,7 +63,6 @@
     <Compile Include="Assets\Models\UserTaskBPMN.cs" />
     <Compile Include="Assets\Models\PathProcess.cs" />
     <Compile Include="Assets\Models\ActivityAndLocationHistory.cs" />
-    <Compile Include="Assets\Models\StorageLocationDTO.cs" />
     <Compile Include="Assets\Models\CarPosition.cs" />
     <Compile Include="Assets\Models\VirtualMapLocation.cs" />
     <Compile Include="Assets\Models\LoginResponse.cs" />

@@ -33,9 +33,13 @@ namespace UI
         [SerializeField] private Sprite confirmedIcon; // Icon for activities with location
         [SerializeField] private Sprite notConfirmedIcon; // Icon for activities without location
         [SerializeField] private Dropdown carModelDropdown; // Reference to the Dropdown
-        [SerializeField] private Button ProcessFlowButton;
+        [SerializeField] private Button ProcessFlowButton; 
         [SerializeField] private GameObject carTimeline;
         [SerializeField] private GameObject UpdateLocation;
+        [SerializeField] private Button storageButton;
+        private WarehouseViewController warehouseViewController;
+
+
 
         private ActivityAndLocationHistory activityAndLocationHistoryOfCar;
         private APIscript apiManager;
@@ -54,6 +58,26 @@ namespace UI
         void Start()
         {
             closePage.onClick.AddListener(ClosePanel);
+            if (storageButton != null)
+                storageButton.onClick.AddListener(OpenWarehouseForThisCar);
+            warehouseViewController = FindObjectOfType<WarehouseViewController>();
+            if (warehouseViewController == null)
+                Debug.LogError("[CarInfoDetailPanel] WarehouseViewController não encontrado na cena!");
+
+            // ligar botão por nome (sem arrastar)
+            var t = transform.Find("OpenWarehouseStorageButton");
+            if (t != null)
+            {
+                var btn = t.GetComponent<Button>();
+                if (btn != null) btn.onClick.AddListener(OpenWarehouseForThisCar);
+            }
+            else
+            {
+                Debug.LogWarning("[CarInfoDetailPanel] Botão OpenWarehouseStorageButton não encontrado (verifica o nome).");
+            }
+
+
+
             carPrefabPaths = new Dictionary<int, string>()
         {
             { 0, "CarPrefabs/Car1" }, // Path relative to the Resources folder
@@ -78,6 +102,8 @@ namespace UI
             carsList = GameObject.Find("CarsList");
             uiManager = GameObject.Find("UIManager").GetComponent<UIManager>();
         }
+
+       
 
         public void SetUp(Car car, ColorPickerCar colorPickerCar, GameObject currentGameObjectCar)
         {
@@ -508,6 +534,29 @@ namespace UI
                 uiManager.InteractableOn();
             };
         }
+
+        //WAREHOUSE
+
+        private void OpenWarehouseForThisCar()
+        {
+            if (warehouseViewController == null)
+            {
+                Debug.LogError("[CarInfoDetailPanel] warehouseViewController não atribuído no Inspector");
+                return;
+            }
+
+            if (currentCarClass == null)
+            {
+                Debug.LogError("[CarInfoDetailPanel] currentCarClass é null (SetUp ainda não foi chamado?)");
+                return;
+            }
+
+            // carId do carro selecionado
+            string carId = currentCarClass.id;
+
+            warehouseViewController.OpenWarehouseForCar(carId);
+        }
+
 
     }
 }

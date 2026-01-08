@@ -1,0 +1,288 @@
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+
+public class SectionPlacementController : MonoBehaviour
+{
+    [Header("Placement Prefab")]
+    [SerializeField] private GameObject sectionPrefab;
+
+    [Header("Placement References")]
+    [SerializeField] private Transform cameraRigOrCamera;
+
+    [Header("Warehouse Limits (X/Z)")]
+    [SerializeField] private Vector2 warehouseBoundsX = new Vector2(0, 0);
+    [SerializeField] private Vector2 warehouseBoundsZ = new Vector2(0, 0);
+
+    [Header("Placement Tuning")]
+    [SerializeField] private float spawnDistance = 2.5f;
+    [SerializeField] private float fixedY = 0f;
+    [SerializeField] private LayerMask collisionMask;       // layer das estantes existentes
+    [SerializeField] private float overlapPadding = 0.05f;  // padding para colisões
+
+    [Header("UI")]
+    [SerializeField] private Button addButton;              // "+"
+    [SerializeField] private Button saveButton;             // "Save"
+    [SerializeField] private Button cancelButton;           // "X"
+    [SerializeField] private GameObject placementControls;  // painel que contém Save/X
+
+    [Header("Ghost Visual Feedback")]
+    [SerializeField] private Color validTint = new Color(0f, 1f, 0f, 0.35f);
+    [SerializeField] private Color invalidTint = new Color(1f, 0f, 0f, 0.35f);
+
+    private GameObject ghostInstance;
+    private ShelfSection ghostSection;
+    private BoxCollider ghostCollider;
+
+    private bool isPlacing = false;
+    private bool canPlace = false;
+
+    private Renderer[] ghostRenderers;
+    private readonly List<Color> originalColors = new List<Color>();
+
+    private void Awake()
+    {
+        if (placementControls != null)
+            placementControls.SetActive(false);
+
+        if (saveButton != null)
+            saveButton.interactable = false;
+
+        if (addButton != null)
+            addButton.onClick.AddListener(StartPlacement);
+
+        if (saveButton != null)
+            saveButton.onClick.AddListener(SavePlacement);
+
+        if (cancelButton != null)
+            cancelButton.onClick.AddListener(CancelPlacement);
+    }
+
+    private void Update()
+    {
+        if (!isPlacing || ghostInstance == null) return;
+
+        UpdateGhostTransform();
+        ValidateGhost();
+        UpdateGhostVisual();
+    }
+
+    // -------------------------
+    // PUBLIC
+    // -------------------------
+    public void StartPlacement()
+    {
+        if (isPlacing) return;
+
+        if (sectionPrefab == null)
+        {
+            Debug.LogError("[SectionPlacementController] sectionPrefab não atribuído.");
+            return;
+        }
+
+        if (cameraRigOrCamera == null)
+        {
+            Debug.LogError("[SectionPlacementController] cameraRigOrCamera não atribuído.");
+            return;
+        } 
+
+        ghostInstance = Instantiate(sectionPrefab);
+        ghostInstance.name = "SECTION_GHOST";
+
+        ghostSection = ghostInstance.GetComponent<ShelfSection>();
+        if (ghostSection == null)
+        {
+            Debug.LogError("[SectionPlacementController] O prefab não tem ShelfSection no root.");
+        }
+
+        // collider para overlap
+        ghostCollider = ghostInstance.GetComponentInChildren<BoxCollider>();
+        if (ghostCollider == null)
+        {
+            Debug.LogWarning("[SectionPlacementController] Ghost não tem BoxCollider. Adiciona um no prefab.");
+        }
+
+        // Renderers para feedback
+        ghostRenderers = ghostInstance.GetComponentsInChildren<Renderer>(true);
+        originalColors.Clear();
+        foreach (var r in ghostRenderers)
+        {
+            originalColors.Add(r.material.color);
+        }
+
+        isPlacing = true;
+
+        if (placementControls != null)
+            placementControls.SetActive(true);
+
+        if (addButton != null)
+            addButton.interactable = false;
+
+        if (saveButton != null)
+            saveButton.interactable = false;
+
+        UpdateGhostTransform();
+        ValidateGhost();
+        UpdateGhostVisual();
+    }
+
+    // -------------------------
+    // CORE
+    // -------------------------
+    private void UpdateGhostTransform()
+    {
+        Vector3 target = cameraRigOrCamera.position + cameraRigOrCamera.forward * spawnDistance;
+
+        
+        target.y = fixedY;
+
+        // clamp X/Z pelos limites do armazém
+        target.x = Mathf.Clamp(target.x, warehouseBoundsX.x, warehouseBoundsX.y);
+        target.z = Mathf.Clamp(target.z, warehouseBoundsZ.x, warehouseBoundsZ.y);
+
+        ghostInstance.transform.position = target;
+
+        
+        Vector3 fwd = cameraRigOrCamera.forward;
+        fwd.y = 0f;
+        if (fwd.sqrMagnitude > 0.001f)
+        {
+            ghostInstance.transform.rotation = Quaternion.LookRotation(fwd.normalized, Vector3.up);
+        }
+    }
+
+    private void ValidateGhost()
+    {
+        canPlace = true;
+
+        // colisões com outras estantes
+        if (ghostCollider != null)
+        {
+            Vector3 center = ghostCollider.bounds.center;
+            Vector3 halfExtents = ghostCollider.bounds.extents + Vector3.one * overlapPadding;
+            Quaternion rot = ghostInstance.transform.rotation;
+
+            Collider[] hits = Physics.OverlapBox(center, halfExtents, rot, collisionMask, QueryTriggerInteraction.Ignore);
+
+            foreach (var h in hits)
+            {
+                if (h == null) continue;
+
+                // Ignorar o próprio ghost
+                if (h.transform.IsChildOf(ghostInstance.transform)) continue;
+
+                canPlace = false;
+                break;
+            }
+        }
+
+        if (saveButton != null)
+            saveButton.interactable = canPlace;
+    }
+
+    private void UpdateGhostVisual()
+    {
+        if (ghostRenderers == null) return;
+
+        Color tint = canPlace ? validTint : invalidTint;
+
+        for (int i = 0; i < ghostRenderers.Length; i++)
+        {
+            var r = ghostRenderers[i];
+            if (r == null) continue;
+
+            Color baseColor = originalColors.Count > i ? originalColors[i] : r.material.color;
+
+            Color newColor = baseColor;
+            newColor.r = Mathf.Lerp(baseColor.r, tint.r, 0.6f);
+            newColor.g = Mathf.Lerp(baseColor.g, tint.g, 0.6f);
+            newColor.b = Mathf.Lerp(baseColor.b, tint.b, 0.6f);
+            newColor.a = tint.a;
+
+            r.material.color = newColor;
+        }
+    }
+
+    // -------------------------
+    // CONFIRM / CANCEL
+    // -------------------------
+    private void SavePlacement()
+    {
+        if (!isPlacing || ghostInstance == null) return;
+        if (!canPlace) return;
+
+        RestoreGhostMaterials();
+
+        if (WarehouseManager.Instance != null)
+        {
+            WarehouseManager.Instance.AddSectionRuntime(ghostInstance);
+        }
+        else
+        {
+            Debug.LogWarning("[SectionPlacementController] WarehouseManager.Instance é null.");
+        }
+
+        EndPlacement(keepObject: true);
+    }
+
+
+    private void CancelPlacement()
+    {
+        if (!isPlacing) return;
+        EndPlacement(keepObject: false);
+    }
+
+    private void EndPlacement(bool keepObject)
+    {
+        isPlacing = false;
+        canPlace = false;
+
+        if (placementControls != null)
+            placementControls.SetActive(false);
+
+        if (addButton != null)
+            addButton.interactable = true;
+
+        if (!keepObject && ghostInstance != null)
+            Destroy(ghostInstance);
+
+        ghostInstance = null;
+        ghostSection = null;
+        ghostCollider = null;
+        ghostRenderers = null;
+        originalColors.Clear();
+
+        if (saveButton != null)
+            saveButton.interactable = false;
+    }
+
+    private void RestoreGhostMaterials()
+    {
+        if (ghostRenderers == null) return;
+
+        for (int i = 0; i < ghostRenderers.Length; i++)
+        {
+            var r = ghostRenderers[i];
+            if (r == null) continue;
+
+            if (originalColors.Count > i)
+            {
+                Color c = originalColors[i];
+                c.a = 1f;
+                r.material.color = c;
+            }
+        }
+    }
+
+   
+
+    // -------------------------
+    // OPTIONAL: set bounds at runtime
+    // -------------------------
+    public void SetWarehouseBounds(Vector2 boundsX, Vector2 boundsZ, float y)
+    {
+        warehouseBoundsX = boundsX;
+        warehouseBoundsZ = boundsZ;
+        fixedY = y;
+    }
+}

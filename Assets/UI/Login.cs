@@ -17,6 +17,11 @@ namespace UI
 
     public class Login : MonoBehaviour
     {
+
+        //NOVO Tirar depois
+        [Header("Temporary Dev Mode")]
+        [SerializeField] private bool bypassLoginAsAdmin = true; // <-- mete true enquanto o server está em baixo
+
         [Header("Login Input")]
         public InputField emailInput;
         public InputField passwordInput;
@@ -44,6 +49,13 @@ namespace UI
                 return;
             }
             workshopRoof = GameObject.Find("oficina").GetComponent<Roof>();
+
+            // BYPASS TEMPORÁRIO
+            if (bypassLoginAsAdmin)
+            {
+                EnterAsAdmin_NoServer();
+                return;
+            }
             ShowLoginView();
         }
 
@@ -57,8 +69,32 @@ namespace UI
             }
         }
 
+        private void EnterAsAdmin_NoServer()
+        {
+            // Não precisamos de loginView
+            workshopRoof.ActiveRoof();
+            loginView.SetActive(false);
+
+            // Força Admin view sem depender do apiManager
+            loggedInView.SetActive(true);
+
+            // Se quiseres manter consistência visual:
+            locationsView.SetActive(false);
+            simulationView.SetActive(true); // ou false, dependendo do que queres testar
+
+            Debug.Log("[DEV] Bypass login ativo: a entrar como ADMIN (temporário).");
+        }
+
+
         public async void LoginUser()
         {
+
+            //  BYPASS TEMPORÁRIO
+            if (bypassLoginAsAdmin)
+            {
+                EnterAsAdmin_NoServer();
+                return;
+            }
             string email = emailInput.text;
             string password = passwordInput.text;
             warningUsernameText.text = "";

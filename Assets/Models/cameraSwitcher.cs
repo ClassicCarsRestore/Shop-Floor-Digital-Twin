@@ -1,44 +1,38 @@
-using System.Collections;
 using System.Collections.Generic;
 using Cinemachine;
-using UnityEngine;
-
 
 namespace Models
 {
     public class CameraSwitcher
     {
         static List<CinemachineVirtualCamera> cameras = new List<CinemachineVirtualCamera>();
-
         private static CinemachineVirtualCamera activeCamera = null;
 
-        public static bool isActiveCamera(CinemachineVirtualCamera cam)
-        {
-            return cam == activeCamera;
-        }
+        public static bool isActiveCamera(CinemachineVirtualCamera cam) => cam == activeCamera;
 
         public static void switchCamera(CinemachineVirtualCamera cam)
         {
-            cam.Priority = 10;
+            if (cam == null) return;
+
             activeCamera = cam;
-            foreach (CinemachineVirtualCamera c in cameras)
+            cam.Priority = 10;
+
+            foreach (var c in cameras)
             {
-                if (c != cam && c.Priority != 0)
-                {
-                    c.Priority = 0;
-                }
+                if (c != null && c != cam) c.Priority = 0;
             }
         }
 
         public static void Register(CinemachineVirtualCamera cam)
         {
-            cameras.Add(cam);
+            if (cam == null) return;
+            if (!cameras.Contains(cam)) cameras.Add(cam);
         }
 
         public static void Unregister(CinemachineVirtualCamera cam)
         {
             cameras.Remove(cam);
+            if (activeCamera == cam) activeCamera = null;
         }
-
     }
 }
