@@ -112,6 +112,7 @@
     <Compile Include="Assets\ColorPicker\Scripts\InputHex.cs" />
     <Compile Include="Assets\Warehouse\StorageBox.cs" />
     <Compile Include="Assets\UI\Login.cs" />
+    <Compile Include="Assets\SectionRemodelController.cs" />
     <Compile Include="Assets\Objects\ColorPickerLocation.cs" />
     <Compile Include="Assets\HighlightTarget.cs" />
     <Compile Include="Assets\ColorPicker\Scripts\InputChannel.cs" />

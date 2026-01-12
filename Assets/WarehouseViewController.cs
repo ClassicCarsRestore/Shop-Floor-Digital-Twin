@@ -58,14 +58,14 @@ public class WarehouseViewController : MonoBehaviour
                     carId,
                     onSuccess: (carRows) =>
                     {
-                        // Se o endpoint já vier só com rows do carro:
+                        
                         WarehouseManager.Instance.HighlightCarBoxes(carId, carRows);
                     },
                     onError: (err2) =>
                     {
                         Debug.LogWarning("[WarehouseViewController] GetStorageForCar error: " + err2);
 
-                        // Fallback: se tivermos ALL, filtramos por carId
+                        
                         WarehouseManager.Instance.HighlightCarBoxes(carId, lastAllRows);
                     }
                 ));

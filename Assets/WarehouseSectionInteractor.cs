@@ -5,6 +5,7 @@ public class WarehouseSectionInteractor : MonoBehaviour
     [SerializeField] private Camera rayCamera;                 // normalmente Camera.main
     [SerializeField] private LayerMask sectionMask;            // WarehouseSection
     [SerializeField] private WarehouseSectionSelection selection;
+    [SerializeField] private SectionRemodelController remodelController;
 
     public bool IsActive { get; set; } = false;
 
@@ -14,9 +15,17 @@ public class WarehouseSectionInteractor : MonoBehaviour
     {
         if (!IsActive) return;
 
+        if (remodelController != null && remodelController.IsRemodeling)
+        {
+            ClearHover();
+            return;
+        }
+
+
         if (rayCamera == null) rayCamera = Camera.main;
         if (rayCamera == null) return;
 
+        
         Ray ray = rayCamera.ScreenPointToRay(Input.mousePosition);
 
         if (Physics.Raycast(ray, out var hit, 5000f, sectionMask, QueryTriggerInteraction.Ignore))

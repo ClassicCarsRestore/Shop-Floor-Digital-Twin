@@ -25,6 +25,7 @@ public class SectionPlacementController : MonoBehaviour
     [SerializeField] private Button saveButton;             // "Save"
     [SerializeField] private Button cancelButton;           // "X"
     [SerializeField] private GameObject placementControls;  // painel que contém Save/X
+    //[SerializeField] private GameObject editControls;
 
     [Header("Ghost Visual Feedback")]
     [SerializeField] private Color validTint = new Color(0f, 1f, 0f, 0.35f);
@@ -37,8 +38,27 @@ public class SectionPlacementController : MonoBehaviour
     private bool isPlacing = false;
     private bool canPlace = false;
 
+    public bool IsPlacing => isPlacing;
+    public bool IsEditing => isEditing;
+
+    // startedEditingSection: dispara quando entras no modo edit placement
+    public System.Action<ShelfSection> OnEditPlacementStarted;
+
+    // finishedEditingSection: dispara quando terminas um edit placement (save = true / cancel = false)
+    public System.Action<ShelfSection, bool> OnEditPlacementFinished;
+
+
     private Renderer[] ghostRenderers;
-    private readonly List<Color> originalColors = new List<Color>();
+
+    // EDIT state
+    private bool isEditing = false;
+    private Vector3 editOriginalPos;
+    private Quaternion editOriginalRot;
+
+    // MaterialPropertyBlock (não altera materiais reais)
+    private MaterialPropertyBlock mpb;
+    private static readonly int ColorProp = Shader.PropertyToID("_Color");
+    private static readonly int BaseColorProp = Shader.PropertyToID("_BaseColor");
 
     private void Awake()
     {
@@ -56,6 +76,8 @@ public class SectionPlacementController : MonoBehaviour
 
         if (cancelButton != null)
             cancelButton.onClick.AddListener(CancelPlacement);
+
+        mpb = new MaterialPropertyBlock();
     }
 
     private void Update()
@@ -84,11 +106,11 @@ public class SectionPlacementController : MonoBehaviour
         {
             Debug.LogError("[SectionPlacementController] cameraRigOrCamera não atribuído.");
             return;
-        } 
+        }
 
+        // --- (mantido igual na estrutura) ---
         ghostInstance = Instantiate(sectionPrefab);
         ghostInstance.name = "SECTION_GHOST";
-
         ghostSection = ghostInstance.GetComponent<ShelfSection>();
         if (ghostSection == null)
         {
@@ -104,12 +126,8 @@ public class SectionPlacementController : MonoBehaviour
 
         // Renderers para feedback
         ghostRenderers = ghostInstance.GetComponentsInChildren<Renderer>(true);
-        originalColors.Clear();
-        foreach (var r in ghostRenderers)
-        {
-            originalColors.Add(r.material.color);
-        }
 
+        isEditing = false; // create mode
         isPlacing = true;
 
         if (placementControls != null)
@@ -126,14 +144,68 @@ public class SectionPlacementController : MonoBehaviour
         UpdateGhostVisual();
     }
 
+    // MOVE / EDIT placement (não mexe no StartPlacement)
+    public void StartEditPlacement(ShelfSection section)
+    {
+        if (isPlacing) return;
+
+        if (section == null)
+        {
+            Debug.LogWarning("[SectionPlacementController] StartEditPlacement: section is null");
+            return;
+        }
+
+        if (cameraRigOrCamera == null)
+        {
+            Debug.LogError("[SectionPlacementController] cameraRigOrCamera não atribuído.");
+            return;
+        }
+
+        
+
+        // usa a estante existente como "ghost"
+        ghostSection = section;
+        ghostInstance = section.gameObject;
+
+        editOriginalPos = ghostInstance.transform.position;
+        editOriginalRot = ghostInstance.transform.rotation;
+
+        ghostCollider = ghostInstance.GetComponentInChildren<BoxCollider>();
+        if (ghostCollider == null)
+        {
+            Debug.LogWarning("[SectionPlacementController] Section a editar não tem BoxCollider.");
+        }
+
+        ghostRenderers = ghostInstance.GetComponentsInChildren<Renderer>(true);
+
+        isEditing = true;
+        isPlacing = true;
+
+        if (placementControls != null)
+            placementControls.SetActive(true);
+
+        if (addButton != null)
+            addButton.interactable = false;
+
+        if (saveButton != null)
+            saveButton.interactable = false;
+
+
+        OnEditPlacementStarted?.Invoke(section);
+
+        UpdateGhostTransform();
+        ValidateGhost();
+        UpdateGhostVisual();
+        
+
+    }
+
     // -------------------------
     // CORE
     // -------------------------
     private void UpdateGhostTransform()
     {
         Vector3 target = cameraRigOrCamera.position + cameraRigOrCamera.forward * spawnDistance;
-
-        
         target.y = fixedY;
 
         // clamp X/Z pelos limites do armazém
@@ -142,7 +214,7 @@ public class SectionPlacementController : MonoBehaviour
 
         ghostInstance.transform.position = target;
 
-        
+        // Alinha com a direção da câmera
         Vector3 fwd = cameraRigOrCamera.forward;
         fwd.y = 0f;
         if (fwd.sqrMagnitude > 0.001f)
@@ -155,7 +227,6 @@ public class SectionPlacementController : MonoBehaviour
     {
         canPlace = true;
 
-        // colisões com outras estantes
         if (ghostCollider != null)
         {
             Vector3 center = ghostCollider.bounds.center;
@@ -168,7 +239,7 @@ public class SectionPlacementController : MonoBehaviour
             {
                 if (h == null) continue;
 
-                // Ignorar o próprio ghost
+                // Ignorar o próprio ghost / section em edição
                 if (h.transform.IsChildOf(ghostInstance.transform)) continue;
 
                 canPlace = false;
@@ -191,15 +262,29 @@ public class SectionPlacementController : MonoBehaviour
             var r = ghostRenderers[i];
             if (r == null) continue;
 
-            Color baseColor = originalColors.Count > i ? originalColors[i] : r.material.color;
+            // NÃO tocar em r.material / r.sharedMaterial
+            // Só override visual por instância:
+            r.GetPropertyBlock(mpb);
 
-            Color newColor = baseColor;
-            newColor.r = Mathf.Lerp(baseColor.r, tint.r, 0.6f);
-            newColor.g = Mathf.Lerp(baseColor.g, tint.g, 0.6f);
-            newColor.b = Mathf.Lerp(baseColor.b, tint.b, 0.6f);
-            newColor.a = tint.a;
+            // tenta URP (_BaseColor) e Standard (_Color)
+            mpb.SetColor(BaseColorProp, tint);
+            mpb.SetColor(ColorProp, tint);
 
-            r.material.color = newColor;
+            r.SetPropertyBlock(mpb);
+        }
+    }
+
+    private void ClearGhostVisual()
+    {
+        if (ghostRenderers == null) return;
+
+        for (int i = 0; i < ghostRenderers.Length; i++)
+        {
+            var r = ghostRenderers[i];
+            if (r == null) continue;
+
+            // limpa overrides (volta ao material normal)
+            r.SetPropertyBlock(null);
         }
     }
 
@@ -211,24 +296,51 @@ public class SectionPlacementController : MonoBehaviour
         if (!isPlacing || ghostInstance == null) return;
         if (!canPlace) return;
 
-        RestoreGhostMaterials();
+        ClearGhostVisual();
 
-        if (WarehouseManager.Instance != null)
+        // CREATE: adiciona à lista (como já fazias)
+        if (!isEditing)
         {
-            WarehouseManager.Instance.AddSectionRuntime(ghostInstance);
-        }
-        else
-        {
-            Debug.LogWarning("[SectionPlacementController] WarehouseManager.Instance é null.");
+            if (WarehouseManager.Instance != null)
+            {
+                WarehouseManager.Instance.AddSectionRuntime(ghostInstance);
+            }
+            else
+            {
+                Debug.LogWarning("[SectionPlacementController] WarehouseManager.Instance é null.");
+            }
+
+            EndPlacement(keepObject: true);
+            return;
         }
 
+        // EDIT: não mexe em listas, ids, nomes. Só termina.
+        var finishedSection = ghostSection;
+        OnEditPlacementFinished?.Invoke(finishedSection, true);
         EndPlacement(keepObject: true);
-    }
 
+      
+    }
 
     private void CancelPlacement()
     {
         if (!isPlacing) return;
+
+        // EDIT: voltar à pos/rot original
+        if (isEditing && ghostInstance != null)
+        {
+            ghostInstance.transform.position = editOriginalPos;
+            ghostInstance.transform.rotation = editOriginalRot;
+            ClearGhostVisual();
+            var finishedSection = ghostSection;
+            OnEditPlacementFinished?.Invoke(finishedSection, false);
+            EndPlacement(keepObject: true);
+
+            return;
+        }
+
+        // CREATE: destruir ghost
+        ClearGhostVisual();
         EndPlacement(keepObject: false);
     }
 
@@ -243,6 +355,7 @@ public class SectionPlacementController : MonoBehaviour
         if (addButton != null)
             addButton.interactable = true;
 
+        // se era criação e cancelou, destrói
         if (!keepObject && ghostInstance != null)
             Destroy(ghostInstance);
 
@@ -250,31 +363,21 @@ public class SectionPlacementController : MonoBehaviour
         ghostSection = null;
         ghostCollider = null;
         ghostRenderers = null;
-        originalColors.Clear();
+
+        isEditing = false;
 
         if (saveButton != null)
             saveButton.interactable = false;
     }
 
-    private void RestoreGhostMaterials()
+    public void SetAddButtonInteractable(bool on)
     {
-        if (ghostRenderers == null) return;
-
-        for (int i = 0; i < ghostRenderers.Length; i++)
-        {
-            var r = ghostRenderers[i];
-            if (r == null) continue;
-
-            if (originalColors.Count > i)
-            {
-                Color c = originalColors[i];
-                c.a = 1f;
-                r.material.color = c;
-            }
-        }
+        if (addButton != null)
+            addButton.interactable = on;
     }
 
-   
+ 
+
 
     // -------------------------
     // OPTIONAL: set bounds at runtime
