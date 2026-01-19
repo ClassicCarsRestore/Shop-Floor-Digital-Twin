@@ -8,10 +8,10 @@ public class WarehouseViewController : MonoBehaviour
     [Header("References")]
     [SerializeField] private CameraSystem cameraSystem;
     [SerializeField] private StorageRepository storageRepository;
-    //[SerializeField] private WarehouseHUD warehouseHUD;
+  
 
 
-    // guarda o último ALL para fallback (se endpoint do carro falhar)
+    
     private List<StorageRowDTO> lastAllRows = new List<StorageRowDTO>();
 
     public void OpenWarehouseAll()

@@ -2,8 +2,8 @@ using UnityEngine;
 
 public class WarehouseSectionInteractor : MonoBehaviour
 {
-    [SerializeField] private Camera rayCamera;                 // normalmente Camera.main
-    [SerializeField] private LayerMask sectionMask;            // WarehouseSection
+    [SerializeField] private Camera rayCamera;                 
+    [SerializeField] private LayerMask sectionMask;            
     [SerializeField] private WarehouseSectionSelection selection;
     [SerializeField] private SectionRemodelController remodelController;
 
@@ -39,7 +39,7 @@ public class WarehouseSectionInteractor : MonoBehaviour
                 if (currentHover != null) currentHover.SetHighlight(true);
             }
 
-            // click para selecionar
+           
             if (Input.GetMouseButtonDown(0))
             {
                 var sec = hit.collider.GetComponentInParent<ShelfSection>();

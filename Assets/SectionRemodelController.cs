@@ -49,7 +49,7 @@ public class SectionRemodelController : MonoBehaviour
     private static readonly int BaseColorProp = Shader.PropertyToID("_BaseColor");
 
     public event Action<ShelfSection> OnRemodelStarted;
-    public event Action<ShelfSection, bool> OnRemodelFinished; // bool saved
+    public event Action<ShelfSection, bool> OnRemodelFinished; 
 
     public bool IsRemodeling { get; private set; }
 
@@ -104,7 +104,7 @@ public class SectionRemodelController : MonoBehaviour
 
         OnRemodelStarted?.Invoke(current);
 
-        // IMPORTANTE: ranges fixos e só sincronizar UI, sem aplicar scale
+       
         ApplyRangesToSliders();
         SyncUIFromSection();
         ValidateAndApplyFeedback();
@@ -118,7 +118,7 @@ public class SectionRemodelController : MonoBehaviour
 
         Vector3 s = current.transform.localScale;
 
-        // sliders mostram o valor “clamped” dentro do range
+       
         float sx = Mathf.Clamp(s.x, widthRange.x, widthRange.y);
         float sy = Mathf.Clamp(s.y, heightRange.x, heightRange.y);
         float sz = Mathf.Clamp(s.z, lengthRange.x, lengthRange.y);
@@ -127,7 +127,7 @@ public class SectionRemodelController : MonoBehaviour
         if (heightSlider != null) heightSlider.SetValueWithoutNotify(sy);
         if (lengthSlider != null) lengthSlider.SetValueWithoutNotify(sz);
 
-        // inputs mostram o valor REAL atual (display)
+        
         if (widthInput != null) widthInput.SetTextWithoutNotify(s.x.ToString("0.##"));
         if (heightInput != null) heightInput.SetTextWithoutNotify(s.y.ToString("0.##"));
         if (lengthInput != null) lengthInput.SetTextWithoutNotify(s.z.ToString("0.##"));

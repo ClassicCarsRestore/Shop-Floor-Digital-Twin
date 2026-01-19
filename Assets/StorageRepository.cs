@@ -1,119 +1,140 @@
-using System;
+ï»¿using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Networking;
+using Newtonsoft.Json;
 
 public class StorageRepository : MonoBehaviour
 {
-    [Header("API")]
-    [SerializeField] private string baseUrl = "https://api-teu-endpoint";
+    private string baseUrl = "https://ims-server.raimundobranco.com";
 
-    [Header("Dev / Offline")]
-    [SerializeField] private bool useMockData = false;
+    [Header("Auth")]
+    [SerializeField] private string jwtToken;
 
     public IEnumerator GetAllStorage(Action<List<StorageRowDTO>> onSuccess, Action<string> onError)
     {
-        if (useMockData)
-        {
-            onSuccess?.Invoke(Mock_AllRows());
-            yield break;
-        }
+        string url = $"{baseUrl}/items/?skip=0&limit=50";
+        Debug.Log("[StorageRepository] Token len=" + (jwtToken != null ? jwtToken.Length : 0));
+        Debug.Log("[StorageRepository] GET " + url);
 
-        string url = $"{baseUrl}/storage"; // endpoint ALL
-        yield return GetRows(url, onSuccess, onError, fallback: Mock_AllRows);
+        yield return GetItems(url, onSuccess, onError);
     }
 
-    public IEnumerator GetStorageForCar(string carId, Action<List<StorageRowDTO>> onSuccess, Action<string> onError)
-    {
-        if (useMockData)
-        {
-            onSuccess?.Invoke(Mock_RowsForCar(carId));
-            yield break;
-        }
-
-        string url = $"{baseUrl}/storage?carId={carId}"; // endpoint por carro
-        yield return GetRows(url, onSuccess, onError, fallback: () => Mock_RowsForCar(carId));
-    }
-
-    private IEnumerator GetRows(
-        string url,
-        Action<List<StorageRowDTO>> onSuccess,
-        Action<string> onError,
-        Func<List<StorageRowDTO>> fallback)
+    private IEnumerator GetItems(string url, Action<List<StorageRowDTO>> onSuccess, Action<string> onError)
     {
         using var req = UnityWebRequest.Get(url);
+
+        if (string.IsNullOrEmpty(jwtToken))
+        {
+            string msg = "[StorageRepository] jwtToken vazio.";
+            Debug.LogError(msg);
+            onError?.Invoke(msg);
+            yield break;
+        }
+
+        req.SetRequestHeader("Authorization", "Bearer " + jwtToken);
+        req.SetRequestHeader("Accept", "application/json");
+
         yield return req.SendWebRequest();
 
         if (req.result != UnityWebRequest.Result.Success)
         {
-            Debug.LogWarning($"[StorageRepository] API falhou: {req.error}. A usar mock.");
-            onError?.Invoke(req.error);
-
-            // fallback para não bloquear desenvolvimento
-            onSuccess?.Invoke(fallback != null ? fallback() : new List<StorageRowDTO>());
+            string body = req.downloadHandler != null ? req.downloadHandler.text : "";
+            string msg = $"[StorageRepository] API falhou: {req.error} | HTTP={(int)req.responseCode} | Body={body}";
+            Debug.LogWarning(msg);
+            onError?.Invoke(msg);
             yield break;
         }
 
         var json = req.downloadHandler.text;
 
-        // Espera: { "rows": [...] }
-        var response = JsonUtility.FromJson<StorageRowsResponseDTO>(json);
-        onSuccess?.Invoke(response?.rows ?? new List<StorageRowDTO>());
-    }
+        List<WarehouseItemDTO> items;
+        try
+        {
+            items = JsonConvert.DeserializeObject<List<WarehouseItemDTO>>(json);
+        }
+        catch (Exception e)
+        {
+            string msg = "[StorageRepository] Erro a fazer parse do JSON (/items/): " + e.Message;
+            Debug.LogError(msg);
+            Debug.LogError("JSON recebido: " + json);
+            onError?.Invoke(msg);
+            yield break;
+        }
 
-    // -----------------------
-    // MOCK DATA (sem BD)
-    // -----------------------
-    private List<StorageRowDTO> Mock_AllRows()
-    {
-        // Ajusta para bater com o teu armazém real:
-        // 10 sections, 3 shelves, 4 areas
         var rows = new List<StorageRowDTO>();
-        string[] carIds = { "CAR_A", "CAR_B", "CAR_C" };
 
-        for (int section = 1; section <= 10; section++)
+        if (items != null)
         {
-            for (int shelf = 1; shelf <= 3; shelf++)
+            foreach (var it in items)
             {
-                for (int area = 1; area <= 4; area++)
+                if (it == null || it.warehouse_location == null) continue;
+
+                rows.Add(new StorageRowDTO
                 {
-                    rows.Add(new StorageRowDTO
+                    carId = it.project_id.ToString(),
+                    location = new StorageLocationDTO
                     {
-                        carId = carIds[UnityEngine.Random.Range(0, carIds.Length)],
-                        location = new StorageLocationDTO
-                        {
-                            section = section.ToString(),
-                            shelf = shelf.ToString(),
-                            area = area.ToString()
-                        }
-                    });
-                }
+                        section = it.warehouse_location.section,
+                        shelf = it.warehouse_location.shelf,
+                        area = it.warehouse_location.area
+                    }
+                });
             }
         }
 
-        return rows;
+        Debug.Log($"[StorageRepository] Parsed rows = {rows.Count}");
+        if (rows.Count > 0)
+            Debug.Log($"[StorageRepository] First row: sec={rows[0].location.section} shelf={rows[0].location.shelf} area={rows[0].location.area} carId={rows[0].carId}");
+
+        onSuccess?.Invoke(rows);
     }
 
-    private List<StorageRowDTO> Mock_RowsForCar(string carId)
+    // Ignorar por enquanto
+    public IEnumerator GetStorageForCar(string carId, Action<List<StorageRowDTO>> onSuccess, Action<string> onError)
     {
-        // Usa o ALL e filtra, para garantir coerência
-        var all = Mock_AllRows();
-        var filtered = new List<StorageRowDTO>();
-        foreach (var r in all)
-            if (r != null && r.carId == carId)
-                filtered.Add(r);
-
-        // se por acaso vier vazio, força umas quantas
-        if (filtered.Count == 0 && all.Count > 0)
-        {
-            for (int i = 0; i < 5 && i < all.Count; i++)
+        return GetAllStorage(
+            (allRows) =>
             {
-                all[i].carId = carId;
-                filtered.Add(all[i]);
-            }
-        }
+                var filtered = allRows.FindAll(r => r.carId == carId);
+                onSuccess?.Invoke(filtered);
+            },
+            onError
+        );
+    }
 
-        return filtered;
+    [Serializable]
+    private class WarehouseItemDTO
+    {
+        public string name;
+        public string description;
+        public string barcode;
+
+        public WarehouseLocationDTO warehouse_location;
+
+        public string car_model_location;
+        public string state;
+        public string image_url;
+
+        public int id;
+        public int project_id;
+        public string car_project_name;
+
+        public int segmentation_session_id;
+
+        
+        public List<string> segmentation_mask_ids;
+
+        public string created_at;
+        public string updated_at;
+    }
+
+    [Serializable]
+    private class WarehouseLocationDTO
+    {
+        public string section;
+        public string shelf;
+        public string area;
     }
 }

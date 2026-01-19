@@ -65,6 +65,7 @@
     <Compile Include="Assets\HeatmapButtonLauncher.cs" />
     <Compile Include="Assets\UI\AddCar.cs" />
     <Compile Include="Assets\Warehouse\WarehouseManager.cs" />
+    <Compile Include="Assets\ShelfSectionShelvesController.cs" />
     <Compile Include="Assets\Objects\CarSlotObject.cs" />
     <Compile Include="Assets\Objects\CarSlotMeshCreator.cs" />
     <Compile Include="Assets\WarehouseSectionInteractor.cs" />
@@ -126,6 +127,7 @@
     <None Include="Assets\CS - Signs Free\Standard 2 Sided.shader" />
     <None Include="Assets\TextMesh Pro\Shaders\TMPro_Mobile.cginc" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF SSD.shader" />
+    <None Include="Assets\Warehouse\NewUnlitShader.shader" />
     <None Include="Assets\QuickOutline\Resources\Shaders\OutlineMask.shader" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Surface-Mobile.shader" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Surface.shader" />

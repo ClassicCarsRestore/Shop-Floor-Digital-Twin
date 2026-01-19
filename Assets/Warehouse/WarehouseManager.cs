@@ -95,7 +95,7 @@ public class WarehouseManager : MonoBehaviour
 
             if (boxesByLocation.TryGetValue(key, out var box) && box != null)
             {
-                // opcional: atualizar carId na box (se quiseres)
+                
                 box.CarId = carId;
                 box.Highlight(true);
             }
@@ -104,7 +104,6 @@ public class WarehouseManager : MonoBehaviour
 
     /// <summary>
     /// Mostra a(s) caixa(s) para um carro específico nas localizações indicadas.
-    /// Serve para testes/uso antigo: ele limpa caixas desse carId e cria só as do carro (com highlight).
     /// </summary>
     public void ShowStorageForCar(string carId, List<StorageLocationDTO> locations)
     {
@@ -129,7 +128,7 @@ public class WarehouseManager : MonoBehaviour
         if (WarehouseRoot != null)
             sectionGO.transform.SetParent(WarehouseRoot, true);
 
-        // garantir componente
+       
         var sec = sectionGO.GetComponent<ShelfSection>();
         if (sec == null)
         {
@@ -303,72 +302,7 @@ public class WarehouseManager : MonoBehaviour
         }
     }
 
-    // ---------------------------
-    // TESTS (sem BD)
-    // ---------------------------
+ 
 
-    [ContextMenu("Test Spawn ALL Boxes (Mock Rows)")]
-    private void TestSpawnAll()
-    {
-        // Exemplo simples: 10 sections, 3 shelves, 4 areas
-        var rows = new List<StorageRowDTO>();
-        string[] cars = { "CAR_A", "CAR_B", "CAR_C" };
-
-        for (int s = 1; s <= 10; s++)
-        {
-            for (int sh = 1; sh <= 3; sh++)
-            {
-                for (int a = 1; a <= 4; a++)
-                {
-                    rows.Add(new StorageRowDTO
-                    {
-                        carId = cars[Random.Range(0, cars.Length)],
-                        location = new StorageLocationDTO
-                        {
-                            section = s.ToString(),
-                            shelf = sh.ToString(),
-                            area = a.ToString()
-                        }
-                    });
-                }
-            }
-        }
-
-        ShowAllStorage(rows);
-    }
-
-    [ContextMenu("Test Highlight CAR_A (Mock Rows)")]
-    private void TestHighlightCarA()
-    {
-        // Se ainda não houver caixas, cria mock completo
-        if (boxesByLocation.Count == 0)
-            TestSpawnAll();
-
-        // Mock só do CAR_A (para simular endpoint do carro)
-        var carRows = new List<StorageRowDTO>();
-        foreach (var kv in boxesByLocation)
-        {
-            if (kv.Value != null && kv.Value.CarId == "CAR_A")
-            {
-                // reconstruir location a partir da key
-                // key = "section-shelf-area"
-                var parts = kv.Key.Split('-');
-                if (parts.Length == 3)
-                {
-                    carRows.Add(new StorageRowDTO
-                    {
-                        carId = "CAR_A",
-                        location = new StorageLocationDTO
-                        {
-                            section = parts[0],
-                            shelf = parts[1],
-                            area = parts[2]
-                        }
-                    });
-                }
-            }
-        }
-
-        HighlightCarBoxes("CAR_A", carRows);
-    }
+  
 }

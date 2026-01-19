@@ -13,9 +13,10 @@ public class WarehouseEditPanel : MonoBehaviour
 
     [SerializeField] private SectionPlacementController placementController;
     [SerializeField] private SectionRemodelController remodelController;
+    private ShelfSectionShelvesController shelvesController;
 
 
-    // opcional: para garantir foco/camera depois do save/cancel
+    
     [SerializeField] private WarehouseSectionSelection selection;
     [SerializeField] private CameraSystem cameraSystem;
 
@@ -28,12 +29,12 @@ public class WarehouseEditPanel : MonoBehaviour
         if (deleteButton != null) deleteButton.onClick.AddListener(DeleteSelected);
         if (moveButton != null) moveButton.onClick.AddListener(EditPlacement);
 
-        // stubs por agora
+       
         if (addShelfButton != null) addShelfButton.onClick.AddListener(AddShelf);
         if (removeShelfButton != null) removeShelfButton.onClick.AddListener(RemoveShelf);
         if (remodelShelfButton != null) remodelShelfButton.onClick.AddListener(RemodelSection);
         if (exitSectionButton != null) exitSectionButton.onClick.AddListener(DeselectAndClose);
-        // subscrever eventos do placement (importante: no Awake para funcionar mesmo se este painel desativar)
+        
         if (placementController != null)
         {
             placementController.OnEditPlacementStarted += HandleEditPlacementStarted;
@@ -111,10 +112,10 @@ public class WarehouseEditPanel : MonoBehaviour
     {
         if (current == null) return;
 
-        // desativa botões de edição imediatamente (extra safety)
+        // desativa botões de edição imediatamente 
         SetEditButtonsInteractable(false);
 
-        // ao começar move placement: precisamos de controls ON
+        // ao começar move placement: controls ON
         if (cameraSystem != null)
             cameraSystem.ActiveControls();
 
@@ -125,14 +126,32 @@ public class WarehouseEditPanel : MonoBehaviour
     private void AddShelf()
     {
         if (current == null) return;
-        Debug.Log("[WarehouseEditPanel] AddShelf (TODO)");
+
+        var ctrl = current.GetComponent<ShelfSectionShelvesController>();
+        if (ctrl == null)
+        {
+            Debug.LogWarning("[WarehouseEditPanel] Esta section não tem ShelfSectionShelvesController.");
+            return;
+        }
+
+        ctrl.AddShelf();
     }
 
     private void RemoveShelf()
     {
         if (current == null) return;
-        Debug.Log("[WarehouseEditPanel] RemoveShelf (TODO)");
+
+        var ctrl = current.GetComponent<ShelfSectionShelvesController>();
+        if (ctrl == null)
+        {
+            Debug.LogWarning("[WarehouseEditPanel] Esta section não tem ShelfSectionShelvesController.");
+            return;
+        }
+
+        ctrl.RemoveShelf();
     }
+
+
 
     private void RemodelSection()
     {
@@ -154,7 +173,7 @@ public class WarehouseEditPanel : MonoBehaviour
         // só reage se for a section atualmente selecionada
         if (current != section) return;
 
-        // esconde o painel para não tapar Save/Cancel
+        
         gameObject.SetActive(false);
     }
 
@@ -168,7 +187,7 @@ public class WarehouseEditPanel : MonoBehaviour
 
         if (selection != null)
         {
-            selection.SelectSection(section); // isto vai: focar camera + mostrar painel + desativar controls
+            selection.SelectSection(section); //focar camera + mostrar painel + desativar controls
         }
         else
         {
@@ -178,12 +197,7 @@ public class WarehouseEditPanel : MonoBehaviour
         }
     }
 
-    private System.Collections.IEnumerator RefocusNextFrame(ShelfSection section)
-    {
-        yield return new WaitForEndOfFrame();
-        if (selection != null && section != null)
-            selection.SelectSection(section);
-    }
+    
 
     // ----------------------------
     // EVENTS do SectionRemodelController
