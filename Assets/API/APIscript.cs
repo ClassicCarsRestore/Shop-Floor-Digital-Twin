@@ -1,11 +1,12 @@
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEngine.Networking;
+using Models;
 using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
-using System;
-using Models;
+using UnityEngine;
+using UnityEngine.Networking;
+using static System.Net.WebRequestMethods;
 
 namespace API
 {
@@ -16,8 +17,9 @@ namespace API
         public const string MANAGER = "manager";
         public const string OWNER = "owner";
 
-         private const string apiUrl = "http://194.210.120.34:5000/api";
-        //private const string apiUrl = "/api";
+        //private const string apiUrl = "http://194.210.120.34:5000/api";
+        //private const string apiUrl = "https://charterturinmonitor.raimundobranco.com/api";
+        private const string apiUrl = "/api";
         private string role;
         private string securityToken;
         public string lastCarLocation;

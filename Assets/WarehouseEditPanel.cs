@@ -24,7 +24,7 @@ public class WarehouseEditPanel : MonoBehaviour
 
     private void Awake()
     {
-        Hide();
+        
 
         if (deleteButton != null) deleteButton.onClick.AddListener(DeleteSelected);
         if (moveButton != null) moveButton.onClick.AddListener(EditPlacement);
@@ -197,7 +197,10 @@ public class WarehouseEditPanel : MonoBehaviour
         }
     }
 
-    
+  
+
+
+
 
     // ----------------------------
     // EVENTS do SectionRemodelController

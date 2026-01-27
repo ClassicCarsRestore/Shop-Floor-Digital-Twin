@@ -1,3 +1,4 @@
+ï»¿using System.Collections;
 using UnityEngine;
 using Objects;
 
@@ -5,38 +6,57 @@ public class WarehouseSectionSelection : MonoBehaviour
 {
     [SerializeField] private CameraSystem cameraSystem;
     [SerializeField] private WarehouseEditPanel warehouseEditPanel;
-
+    [SerializeField] private SectionPlacementController placementController;
 
     public ShelfSection Selected { get; private set; }
+    public bool IsEditing => Selected != null;
+
+    private Coroutine showRoutine;
+
+
 
     public void SelectSection(ShelfSection section)
     {
         if (section == null) return;
 
+        if (placementController != null && placementController.IsPlacing)
+            return;
+
         Selected = section;
 
-        // 1) bloquear movement (WASD/QE)
         if (cameraSystem != null)
             cameraSystem.DesactiveControls();
 
-        // 2) focar a camera na frente da estante
         if (cameraSystem != null)
             cameraSystem.FocusFrontOfSection(section.transform);
 
-        // 3) mostrar botões de edição (inclui o X)
+        // em vez de ShowFor imediato, espera 1 frame
+        if (showRoutine != null) StopCoroutine(showRoutine);
+        showRoutine = StartCoroutine(ShowPanelNextFrame(section));
+    }
+
+    private IEnumerator ShowPanelNextFrame(ShelfSection section)
+    {
+        yield return null; 
+        if (Selected != section) yield break; 
+
         if (warehouseEditPanel != null)
             warehouseEditPanel.ShowFor(section);
     }
 
     public void ClearSelection()
     {
+        if (showRoutine != null)
+        {
+            StopCoroutine(showRoutine);
+            showRoutine = null;
+        }
+
         Selected = null;
 
-        // esconder botões
         if (warehouseEditPanel != null)
             warehouseEditPanel.Hide();
 
-        // voltar a permitir movement
         if (cameraSystem != null)
             cameraSystem.ActiveControls();
     }

@@ -1,6 +1,8 @@
-using System.Collections.Generic;
+Ôªøusing System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
+using Objects;
 
 public class SectionPlacementController : MonoBehaviour
 {
@@ -10,22 +12,52 @@ public class SectionPlacementController : MonoBehaviour
     [Header("Placement References")]
     [SerializeField] private Transform cameraRigOrCamera;
 
-    [Header("Warehouse Limits (X/Z)")]
+    [Header("Camera System")]
+    [SerializeField] private CameraSystem cameraSystem;
+
+    [SerializeField] private WarehouseSectionInteractor sectionInteractor;
+
+
+    [Header("Warehouse Limits (X/Z) - ONLY FOR FP CAMERA")]
     [SerializeField] private Vector2 warehouseBoundsX = new Vector2(0, 0);
     [SerializeField] private Vector2 warehouseBoundsZ = new Vector2(0, 0);
 
     [Header("Placement Tuning")]
-    [SerializeField] private float spawnDistance = 2.5f;
     [SerializeField] private float fixedY = 0f;
-    [SerializeField] private LayerMask collisionMask;       // layer das estantes existentes
-    [SerializeField] private float overlapPadding = 0.05f;  // padding para colisıes
+    [SerializeField] private LayerMask collisionMask;       // estantes/sections existentes
+    [SerializeField] private float overlapPadding = 0.05f;
+
+    [Header("Warehouse Walls (Layer)")]
+    [SerializeField] private LayerMask wallsMask;           // paredes (colliders)
+    [SerializeField] private bool requireHoldLeftMouseToMove = true;
+
+    [Header("Rotation (Placement)")]
+    [SerializeField] private float snapAngle = 90f;
+
+    [Header("Initial Spawn (Inside Warehouse)")]
+    [SerializeField] private Vector3 initialSpawnWorldPos = new Vector3(513f, 85f, -326f);
+
+    // ==========================================================
+    // Auto bounds (opcional). Serve s√≥ para "n√£o ir para fora"
+    // N√ÉO resolve paredes internas (portas/recortes).
+    // ==========================================================
+    [Header("Auto Bounds From Walls (Hard Limit)")]
+    [SerializeField] private bool useWallsAsHardBounds = true;
+    [SerializeField] private float boundsEpsilon = 0.001f;
+
+    private bool wallBoundsReady = false;
+    private Vector2 wallBoundsX;
+    private Vector2 wallBoundsZ;
+
+    [Header("Axis Slide (robusto p/ CAD)")]
+    [SerializeField] private int maxSubSteps = 4; // ajuda se mexes muito por frame
+    [SerializeField] private bool preferXFirst = true;
 
     [Header("UI")]
-    [SerializeField] private Button addButton;              // "+"
-    [SerializeField] private Button saveButton;             // "Save"
-    [SerializeField] private Button cancelButton;           // "X"
-    [SerializeField] private GameObject placementControls;  // painel que contÈm Save/X
-    //[SerializeField] private GameObject editControls;
+    [SerializeField] private Button addButton;
+    [SerializeField] private Button saveButton;
+    [SerializeField] private Button cancelButton;
+    [SerializeField] private GameObject placementControls;
 
     [Header("Ghost Visual Feedback")]
     [SerializeField] private Color validTint = new Color(0f, 1f, 0f, 0.35f);
@@ -41,24 +73,69 @@ public class SectionPlacementController : MonoBehaviour
     public bool IsPlacing => isPlacing;
     public bool IsEditing => isEditing;
 
-    // startedEditingSection: dispara quando entras no modo edit placement
     public System.Action<ShelfSection> OnEditPlacementStarted;
-
-    // finishedEditingSection: dispara quando terminas um edit placement (save = true / cancel = false)
     public System.Action<ShelfSection, bool> OnEditPlacementFinished;
-
 
     private Renderer[] ghostRenderers;
 
-    // EDIT state
     private bool isEditing = false;
     private Vector3 editOriginalPos;
     private Quaternion editOriginalRot;
 
-    // MaterialPropertyBlock (n„o altera materiais reais)
     private MaterialPropertyBlock mpb;
     private static readonly int ColorProp = Shader.PropertyToID("_Color");
     private static readonly int BaseColorProp = Shader.PropertyToID("_BaseColor");
+
+    // Drag (sem teleport)
+    private bool isDragging = false;
+    private Vector3 grabOffset = Vector3.zero;
+    private bool hasGrabOffset = false;
+
+    private Camera mainCam;
+
+    // buffer p/ evitar GC
+    private Collider[] overlapBuffer = new Collider[64];
+    [SerializeField] private bool debugOverlaps = true;
+
+    private void DebugOverlapAtCurrent()
+    {
+        if (!debugOverlaps || ghostCollider == null) return;
+
+        LayerMask mask = wallsMask | collisionMask;
+
+        Vector3 center = ghostCollider.transform.TransformPoint(ghostCollider.center);
+        Quaternion rot = ghostCollider.transform.rotation;
+        Vector3 halfExtents =
+     Vector3.Scale(AbsVec3(ghostCollider.size) * 0.5f,
+                   AbsVec3(ghostCollider.transform.lossyScale));
+
+        halfExtents = AbsVec3(halfExtents); // ‚Äúcinto e suspens√≥rios‚Äù
+        halfExtents += Vector3.one * overlapPadding;
+
+        
+
+        Collider[] hits = Physics.OverlapBox(center, halfExtents, rot, mask, QueryTriggerInteraction.Ignore);
+
+        Debug.Log($"[Overlap] hits={hits.Length} at center={center} halfExt={halfExtents}");
+
+        Debug.Log($"size={ghostCollider.size} lossy={ghostCollider.transform.lossyScale}");
+
+
+        foreach (var h in hits)
+        {
+            if (h == null) continue;
+            if (h.transform.IsChildOf(ghostInstance.transform)) continue;
+
+            Debug.Log($"  -> {h.name} | layer={LayerMask.LayerToName(h.gameObject.layer)} | enabled={h.enabled} | bounds={h.bounds}");
+        }
+    }
+
+    private static Vector3 AbsVec3(Vector3 v)
+    {
+        return new Vector3(Mathf.Abs(v.x), Mathf.Abs(v.y), Mathf.Abs(v.z));
+    }
+
+
 
     private void Awake()
     {
@@ -78,13 +155,20 @@ public class SectionPlacementController : MonoBehaviour
             cancelButton.onClick.AddListener(CancelPlacement);
 
         mpb = new MaterialPropertyBlock();
+        mainCam = Camera.main;
     }
 
     private void Update()
     {
         if (!isPlacing || ghostInstance == null) return;
+        if (mainCam == null) mainCam = Camera.main;
 
-        UpdateGhostTransform();
+        HandleRotationInput();
+        UpdateGhostTransformDrag_NoTeleport_WithAxisSlide();
+        if (Input.GetMouseButton(0))
+            DebugOverlapAtCurrent();
+
+
         ValidateGhost();
         UpdateGhostVisual();
     }
@@ -98,37 +182,37 @@ public class SectionPlacementController : MonoBehaviour
 
         if (sectionPrefab == null)
         {
-            Debug.LogError("[SectionPlacementController] sectionPrefab n„o atribuÌdo.");
+            Debug.LogError("[SectionPlacementController] sectionPrefab n√£o atribu√≠do.");
             return;
         }
 
-        if (cameraRigOrCamera == null)
-        {
-            Debug.LogError("[SectionPlacementController] cameraRigOrCamera n„o atribuÌdo.");
-            return;
-        }
-
-        // --- (mantido igual na estrutura) ---
         ghostInstance = Instantiate(sectionPrefab);
         ghostInstance.name = "SECTION_GHOST";
+
         ghostSection = ghostInstance.GetComponent<ShelfSection>();
         if (ghostSection == null)
-        {
-            Debug.LogError("[SectionPlacementController] O prefab n„o tem ShelfSection no root.");
-        }
+            Debug.LogError("[SectionPlacementController] O prefab n√£o tem ShelfSection no root.");
 
-        // collider para overlap
         ghostCollider = ghostInstance.GetComponentInChildren<BoxCollider>();
         if (ghostCollider == null)
-        {
-            Debug.LogWarning("[SectionPlacementController] Ghost n„o tem BoxCollider. Adiciona um no prefab.");
-        }
+            Debug.LogWarning("[SectionPlacementController] Ghost n√£o tem BoxCollider. Adiciona um no prefab.");
 
-        // Renderers para feedback
         ghostRenderers = ghostInstance.GetComponentsInChildren<Renderer>(true);
 
-        isEditing = false; // create mode
+        isEditing = false;
         isPlacing = true;
+
+        if (sectionInteractor != null)
+        {
+            sectionInteractor.ClearHover();
+            sectionInteractor.IsActive = false;
+        }
+
+
+        if (cameraSystem != null)
+            cameraSystem.EnterTopPlacementView();
+
+        RebuildWallBoundsFromColliders();
 
         if (placementControls != null)
             placementControls.SetActive(true);
@@ -139,31 +223,24 @@ public class SectionPlacementController : MonoBehaviour
         if (saveButton != null)
             saveButton.interactable = false;
 
-        UpdateGhostTransform();
+        Vector3 spawn = initialSpawnWorldPos;
+        spawn.y = fixedY;
+
+        ghostInstance.transform.position = spawn;
+        ForceSnapIntoWarehouseBoundsIfNeeded();
+
+        isDragging = false;
+        hasGrabOffset = false;
+
         ValidateGhost();
         UpdateGhostVisual();
     }
 
-    // MOVE / EDIT placement (n„o mexe no StartPlacement)
     public void StartEditPlacement(ShelfSection section)
     {
         if (isPlacing) return;
+        if (section == null) return;
 
-        if (section == null)
-        {
-            Debug.LogWarning("[SectionPlacementController] StartEditPlacement: section is null");
-            return;
-        }
-
-        if (cameraRigOrCamera == null)
-        {
-            Debug.LogError("[SectionPlacementController] cameraRigOrCamera n„o atribuÌdo.");
-            return;
-        }
-
-        
-
-        // usa a estante existente como "ghost"
         ghostSection = section;
         ghostInstance = section.gameObject;
 
@@ -171,15 +248,22 @@ public class SectionPlacementController : MonoBehaviour
         editOriginalRot = ghostInstance.transform.rotation;
 
         ghostCollider = ghostInstance.GetComponentInChildren<BoxCollider>();
-        if (ghostCollider == null)
-        {
-            Debug.LogWarning("[SectionPlacementController] Section a editar n„o tem BoxCollider.");
-        }
-
         ghostRenderers = ghostInstance.GetComponentsInChildren<Renderer>(true);
 
         isEditing = true;
         isPlacing = true;
+
+        if (sectionInteractor != null)
+        {
+            sectionInteractor.ClearHover();
+            sectionInteractor.IsActive = false;
+        }
+
+
+        if (cameraSystem != null)
+            cameraSystem.EnterTopPlacementView();
+
+        RebuildWallBoundsFromColliders();
 
         if (placementControls != null)
             placementControls.SetActive(true);
@@ -190,56 +274,358 @@ public class SectionPlacementController : MonoBehaviour
         if (saveButton != null)
             saveButton.interactable = false;
 
-
         OnEditPlacementStarted?.Invoke(section);
 
-        UpdateGhostTransform();
+        ForceSnapIntoWarehouseBoundsIfNeeded();
+
+        isDragging = false;
+        hasGrabOffset = false;
+
         ValidateGhost();
         UpdateGhostVisual();
-        
-
     }
 
     // -------------------------
-    // CORE
+    // INPUT
     // -------------------------
-    private void UpdateGhostTransform()
+    private void HandleRotationInput()
     {
-        Vector3 target = cameraRigOrCamera.position + cameraRigOrCamera.forward * spawnDistance;
-        target.y = fixedY;
-
-        // clamp X/Z pelos limites do armazÈm
-        target.x = Mathf.Clamp(target.x, warehouseBoundsX.x, warehouseBoundsX.y);
-        target.z = Mathf.Clamp(target.z, warehouseBoundsZ.x, warehouseBoundsZ.y);
-
-        ghostInstance.transform.position = target;
-
-        // Alinha com a direÁ„o da c‚mera
-        Vector3 fwd = cameraRigOrCamera.forward;
-        fwd.y = 0f;
-        if (fwd.sqrMagnitude > 0.001f)
+        if (Input.GetKeyDown(KeyCode.Q))
         {
-            ghostInstance.transform.rotation = Quaternion.LookRotation(fwd.normalized, Vector3.up);
+            ghostInstance.transform.rotation = Quaternion.Euler(0f, -snapAngle, 0f) * ghostInstance.transform.rotation;
+            ForceSnapIntoWarehouseBoundsIfNeeded();
+        }
+
+        if (Input.GetKeyDown(KeyCode.E))
+        {
+            ghostInstance.transform.rotation = Quaternion.Euler(0f, +snapAngle, 0f) * ghostInstance.transform.rotation;
+            ForceSnapIntoWarehouseBoundsIfNeeded();
         }
     }
 
+    // Drag por plano Y=fixedY, com offset, e movimento com "axis slide" (OverlapBox)
+    private void UpdateGhostTransformDrag_NoTeleport_WithAxisSlide()
+    {
+        if (mainCam == null) return;
+
+        if (Input.GetMouseButtonDown(0))
+        {
+            if (IsPointerOverPlacementUI()) return;
+
+            if (TryGetMousePointOnPlane(out Vector3 hitPoint))
+            {
+                grabOffset = ghostInstance.transform.position - hitPoint;
+                grabOffset.y = 0f;
+                hasGrabOffset = true;
+                isDragging = true;
+            }
+        }
+
+        if (Input.GetMouseButtonUp(0))
+        {
+            isDragging = false;
+            return;
+        }
+
+        if (requireHoldLeftMouseToMove && !Input.GetMouseButton(0))
+            return;
+
+        if (!isDragging || !hasGrabOffset) return;
+
+        if (!TryGetMousePointOnPlane(out Vector3 planePoint))
+            return;
+
+        Vector3 target = planePoint + grabOffset;
+        target.y = fixedY;
+
+        Vector3 current = ghostInstance.transform.position;
+        current.y = fixedY;
+
+        if (useWallsAsHardBounds)
+            target = ClampToWallBounds(target);
+
+        Vector3 desiredMove = target - current;
+        desiredMove.y = 0f;
+
+        if (desiredMove.sqrMagnitude < 0.0000005f) return;
+
+        Vector3 newPos = MoveWithAxisSlide(current, desiredMove);
+        newPos.y = fixedY;
+
+        if (useWallsAsHardBounds)
+            newPos = ClampToWallBounds(newPos);
+
+        newPos.y = fixedY;
+        ghostInstance.transform.position = newPos;
+    }
+
+    private bool TryGetMousePointOnPlane(out Vector3 point)
+    {
+        point = default;
+
+        Ray ray = mainCam.ScreenPointToRay(Input.mousePosition);
+        Plane plane = new Plane(Vector3.up, new Vector3(0f, fixedY, 0f));
+        if (!plane.Raycast(ray, out float enter))
+            return false;
+
+        point = ray.GetPoint(enter);
+        point.y = fixedY;
+        return true;
+    }
+
+    // ==========================================================
+    // CORE: Axis slide com OverlapBox (robusto)
+    // ==========================================================
+    private Vector3 MoveWithAxisSlide(Vector3 startPos, Vector3 desiredMove)
+    {
+        if (ghostCollider == null)
+            return startPos + desiredMove;
+
+        LayerMask blockMask = wallsMask | collisionMask;
+        if (blockMask.value == 0)
+            return startPos + desiredMove;
+
+        // sub-steps (evita "saltar" por cima de paredes finas em moves grandes)
+        int steps = Mathf.Clamp(maxSubSteps, 1, 20);
+        Vector3 stepMove = desiredMove / steps;
+
+        Vector3 pos = startPos;
+
+        for (int s = 0; s < steps; s++)
+        {
+            pos = StepAxisSlide(pos, stepMove, blockMask);
+        }
+
+        return pos;
+    }
+
+    private Vector3 StepAxisSlide(Vector3 pos, Vector3 move, LayerMask blockMask)
+    {
+        // tenta mexer nos eixos separadamente para permitir deslizar
+        if (preferXFirst)
+        {
+            pos = TryAxis(pos, new Vector3(move.x, 0f, 0f), blockMask);
+            pos = TryAxis(pos, new Vector3(0f, 0f, move.z), blockMask);
+        }
+        else
+        {
+            pos = TryAxis(pos, new Vector3(0f, 0f, move.z), blockMask);
+            pos = TryAxis(pos, new Vector3(move.x, 0f, 0f), blockMask);
+        }
+
+        return pos;
+    }
+
+    private Vector3 TryAxis(Vector3 pos, Vector3 axisMove, LayerMask blockMask)
+    {
+        if (axisMove.sqrMagnitude < 0.0000001f) return pos;
+
+        Vector3 candidate = pos + axisMove;
+        candidate.y = fixedY;
+
+        if (WouldOverlapAt(candidate, blockMask))
+        {
+            // bloqueia este eixo
+            return pos;
+        }
+
+        return candidate;
+    }
+
+    private bool WouldOverlapAt(Vector3 candidateRootPos, LayerMask blockMask)
+    {
+        // Queremos testar o ghostCollider como OBB (center/size/rot do collider)
+        // Mas precisamos do centro do collider "como se" o root estivesse em candidateRootPos.
+
+        // offset do centro do collider em world em rela√ß√£o ao root (no estado atual)
+        Vector3 centerNow = ghostCollider.transform.TransformPoint(ghostCollider.center);
+        Vector3 centerOffsetWorld = centerNow - ghostInstance.transform.position;
+
+        Vector3 testCenter = candidateRootPos + centerOffsetWorld;
+
+        Quaternion rot = ghostCollider.transform.rotation;
+        Vector3 halfExtents =
+     Vector3.Scale(AbsVec3(ghostCollider.size) * 0.5f,
+                   AbsVec3(ghostCollider.transform.lossyScale));
+
+        halfExtents = AbsVec3(halfExtents); // ‚Äúcinto e suspens√≥rios‚Äù
+        halfExtents += Vector3.one * overlapPadding;
+
+
+        int count = Physics.OverlapBoxNonAlloc(
+            testCenter,
+            halfExtents,
+            overlapBuffer,
+            rot,
+            blockMask,
+            QueryTriggerInteraction.Ignore);
+
+        for (int i = 0; i < count; i++)
+        {
+            Collider h = overlapBuffer[i];
+            if (h == null) continue;
+            if (h.transform.IsChildOf(ghostInstance.transform)) continue;
+            return true;
+        }
+
+        return false;
+    }
+
+    // -------------------------
+    // WALL BOUNDS (AUTO) - s√≥ exterior
+    // -------------------------
+    private void RebuildWallBoundsFromColliders()
+    {
+        wallBoundsReady = false;
+
+        if (!useWallsAsHardBounds) return;
+
+        if (wallsMask.value == 0)
+        {
+            Debug.LogWarning("[SectionPlacementController] wallsMask vazio. N√£o d√° para calcular bounds.");
+            return;
+        }
+
+        Collider[] all = FindObjectsOfType<Collider>(true);
+        Bounds b = default;
+        bool hasAny = false;
+
+        for (int i = 0; i < all.Length; i++)
+        {
+            Collider c = all[i];
+            if (c == null) continue;
+
+            int layerBit = 1 << c.gameObject.layer;
+            if ((wallsMask.value & layerBit) == 0) continue;
+
+            if (!hasAny)
+            {
+                b = c.bounds;
+                hasAny = true;
+            }
+            else
+            {
+                b.Encapsulate(c.bounds);
+            }
+        }
+
+        if (!hasAny)
+        {
+            Debug.LogWarning("[SectionPlacementController] N√£o encontrei colliders nas layers do wallsMask.");
+            return;
+        }
+
+        wallBoundsX = new Vector2(b.min.x, b.max.x);
+        wallBoundsZ = new Vector2(b.min.z, b.max.z);
+        wallBoundsReady = true;
+    }
+
+    private Vector3 ClampToWallBounds(Vector3 pos)
+    {
+        if (!useWallsAsHardBounds || !wallBoundsReady || ghostCollider == null)
+            return pos;
+
+        Vector3 ext = ghostCollider.bounds.extents;
+
+        float minX = wallBoundsX.x + ext.x;
+        float maxX = wallBoundsX.y - ext.x;
+        float minZ = wallBoundsZ.x + ext.z;
+        float maxZ = wallBoundsZ.y - ext.z;
+
+        pos.x = Mathf.Clamp(pos.x, minX, maxX);
+        pos.z = Mathf.Clamp(pos.z, minZ, maxZ);
+
+        return pos;
+    }
+
+    private bool IsGhostInsideWallBounds()
+    {
+        if (!useWallsAsHardBounds || !wallBoundsReady || ghostCollider == null)
+            return true;
+
+        Bounds gb = ghostCollider.bounds;
+
+        bool insideX = gb.min.x >= wallBoundsX.x - boundsEpsilon && gb.max.x <= wallBoundsX.y + boundsEpsilon;
+        bool insideZ = gb.min.z >= wallBoundsZ.x - boundsEpsilon && gb.max.z <= wallBoundsZ.y + boundsEpsilon;
+
+        return insideX && insideZ;
+    }
+
+    private void ForceSnapIntoWarehouseBoundsIfNeeded()
+    {
+        if (!useWallsAsHardBounds || !wallBoundsReady || ghostCollider == null || ghostInstance == null)
+            return;
+
+        Vector3 p = ghostInstance.transform.position;
+        p.y = fixedY;
+
+        Vector3 snapped = ClampToWallBounds(p);
+        snapped.y = fixedY;
+        ghostInstance.transform.position = snapped;
+    }
+
+    // -------------------------
+    // UI
+    // -------------------------
+    private bool IsPointerOverPlacementUI()
+    {
+        if (EventSystem.current == null) return false;
+
+        if (placementControls != null)
+        {
+            var rt = placementControls.GetComponent<RectTransform>();
+            if (rt != null && RectTransformUtility.RectangleContainsScreenPoint(rt, Input.mousePosition))
+                return true;
+        }
+
+        if (IsOverButton(addButton)) return true;
+        if (IsOverButton(saveButton)) return true;
+        if (IsOverButton(cancelButton)) return true;
+
+        return false;
+    }
+
+    private bool IsOverButton(Button b)
+    {
+        if (b == null) return false;
+        var rt = b.GetComponent<RectTransform>();
+        return rt != null && RectTransformUtility.RectangleContainsScreenPoint(rt, Input.mousePosition);
+    }
+
+    // -------------------------
+    // VALIDATION + VISUAL
+    // -------------------------
     private void ValidateGhost()
     {
         canPlace = true;
 
+        if (!IsGhostInsideWallBounds())
+        {
+            canPlace = false;
+            if (saveButton != null) saveButton.interactable = false;
+            return;
+        }
+
         if (ghostCollider != null)
         {
-            Vector3 center = ghostCollider.bounds.center;
-            Vector3 halfExtents = ghostCollider.bounds.extents + Vector3.one * overlapPadding;
-            Quaternion rot = ghostInstance.transform.rotation;
+            LayerMask combined = collisionMask | wallsMask;
 
-            Collider[] hits = Physics.OverlapBox(center, halfExtents, rot, collisionMask, QueryTriggerInteraction.Ignore);
+            Vector3 center = ghostCollider.transform.TransformPoint(ghostCollider.center);
+            Quaternion rot = ghostCollider.transform.rotation;
+            Vector3 halfExtents =
+     Vector3.Scale(AbsVec3(ghostCollider.size) * 0.5f,
+                   AbsVec3(ghostCollider.transform.lossyScale));
 
-            foreach (var h in hits)
+            halfExtents = AbsVec3(halfExtents); // ‚Äúcinto e suspens√≥rios‚Äù
+            halfExtents += Vector3.one * overlapPadding;
+
+
+            int count = Physics.OverlapBoxNonAlloc(center, halfExtents, overlapBuffer, rot, combined, QueryTriggerInteraction.Ignore);
+
+            for (int i = 0; i < count; i++)
             {
+                var h = overlapBuffer[i];
                 if (h == null) continue;
-
-                // Ignorar o prÛprio ghost / section em ediÁ„o
                 if (h.transform.IsChildOf(ghostInstance.transform)) continue;
 
                 canPlace = false;
@@ -262,14 +648,9 @@ public class SectionPlacementController : MonoBehaviour
             var r = ghostRenderers[i];
             if (r == null) continue;
 
-            // N√O tocar em r.material / r.sharedMaterial
-            // SÛ override visual por inst‚ncia:
             r.GetPropertyBlock(mpb);
-
-            // tenta URP (_BaseColor) e Standard (_Color)
             mpb.SetColor(BaseColorProp, tint);
             mpb.SetColor(ColorProp, tint);
-
             r.SetPropertyBlock(mpb);
         }
     }
@@ -277,19 +658,16 @@ public class SectionPlacementController : MonoBehaviour
     private void ClearGhostVisual()
     {
         if (ghostRenderers == null) return;
-
         for (int i = 0; i < ghostRenderers.Length; i++)
         {
             var r = ghostRenderers[i];
             if (r == null) continue;
-
-            // limpa overrides (volta ao material normal)
             r.SetPropertyBlock(null);
         }
     }
 
     // -------------------------
-    // CONFIRM / CANCEL
+    // SAVE / CANCEL
     // -------------------------
     private void SavePlacement()
     {
@@ -298,48 +676,37 @@ public class SectionPlacementController : MonoBehaviour
 
         ClearGhostVisual();
 
-        // CREATE: adiciona ‡ lista (como j· fazias)
         if (!isEditing)
         {
             if (WarehouseManager.Instance != null)
-            {
                 WarehouseManager.Instance.AddSectionRuntime(ghostInstance);
-            }
-            else
-            {
-                Debug.LogWarning("[SectionPlacementController] WarehouseManager.Instance È null.");
-            }
 
             EndPlacement(keepObject: true);
             return;
         }
 
-        // EDIT: n„o mexe em listas, ids, nomes. SÛ termina.
         var finishedSection = ghostSection;
-        OnEditPlacementFinished?.Invoke(finishedSection, true);
         EndPlacement(keepObject: true);
-
-      
+        OnEditPlacementFinished?.Invoke(finishedSection, true);
+        
     }
 
     private void CancelPlacement()
     {
         if (!isPlacing) return;
 
-        // EDIT: voltar ‡ pos/rot original
         if (isEditing && ghostInstance != null)
         {
             ghostInstance.transform.position = editOriginalPos;
             ghostInstance.transform.rotation = editOriginalRot;
             ClearGhostVisual();
             var finishedSection = ghostSection;
-            OnEditPlacementFinished?.Invoke(finishedSection, false);
+           
             EndPlacement(keepObject: true);
-
+            OnEditPlacementFinished?.Invoke(finishedSection, false);     
             return;
         }
 
-        // CREATE: destruir ghost
         ClearGhostVisual();
         EndPlacement(keepObject: false);
     }
@@ -355,7 +722,6 @@ public class SectionPlacementController : MonoBehaviour
         if (addButton != null)
             addButton.interactable = true;
 
-        // se era criaÁ„o e cancelou, destrÛi
         if (!keepObject && ghostInstance != null)
             Destroy(ghostInstance);
 
@@ -365,27 +731,32 @@ public class SectionPlacementController : MonoBehaviour
         ghostRenderers = null;
 
         isEditing = false;
+        isDragging = false;
+        hasGrabOffset = false;
 
         if (saveButton != null)
             saveButton.interactable = false;
+
+        if (sectionInteractor != null)
+        {
+            sectionInteractor.IsActive = true;
+        }
+
+        if (cameraSystem != null)
+            cameraSystem.ExitTopPlacementViewRestore();
+        
+    }
+
+    public void SetWarehouseBounds(Vector2 boundsX, Vector2 boundsZ, float y)
+    {
+        warehouseBoundsX = boundsX;
+        warehouseBoundsZ = boundsZ;
+        fixedY = y;
     }
 
     public void SetAddButtonInteractable(bool on)
     {
         if (addButton != null)
             addButton.interactable = on;
-    }
-
- 
-
-
-    // -------------------------
-    // OPTIONAL: set bounds at runtime
-    // -------------------------
-    public void SetWarehouseBounds(Vector2 boundsX, Vector2 boundsZ, float y)
-    {
-        warehouseBoundsX = boundsX;
-        warehouseBoundsZ = boundsZ;
-        fixedY = y;
     }
 }

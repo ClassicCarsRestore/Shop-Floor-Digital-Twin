@@ -7,34 +7,53 @@ using Newtonsoft.Json;
 
 public class StorageRepository : MonoBehaviour
 {
-    private string baseUrl = "https://ims-server.raimundobranco.com";
+    [Header("API (Reverse Proxy)")]
+    [Tooltip("Deixa vazio para usar URL relativa (recomendado em WebGL na VM). Ex: ''")]
+    [SerializeField] private string baseUrl = "";
 
-    [Header("Auth")]
-    [SerializeField] private string jwtToken;
+    [Tooltip("Prefixo protegido pelo reverse proxy (Auth via Authentik). Normalmente /inventory")]
+    [SerializeField] private string inventoryPrefix = "/inventory";
+
+    [Tooltip("Endpoint do IMS. No Swagger é /items/")]
+    [SerializeField] private string itemsPath = "/items/";
+
+    [Header("Paging")]
+    [SerializeField] private int skip = 0;
+    [SerializeField] private int limit = 50;
 
     public IEnumerator GetAllStorage(Action<List<StorageRowDTO>> onSuccess, Action<string> onError)
     {
-        string url = $"{baseUrl}/items/?skip=0&limit=50";
-        Debug.Log("[StorageRepository] Token len=" + (jwtToken != null ? jwtToken.Length : 0));
+        // exemplo final: /inventory/items/?skip=0&limit=50
+        string url = BuildUrl($"{itemsPath}?skip={skip}&limit={limit}");
         Debug.Log("[StorageRepository] GET " + url);
 
         yield return GetItems(url, onSuccess, onError);
     }
 
+    private string BuildUrl(string pathWithQuery)
+    {
+        // garante que temos /inventory + /items/... bem formatado
+        string prefix = inventoryPrefix ?? "";
+        if (!prefix.StartsWith("/")) prefix = "/" + prefix;
+        prefix = prefix.TrimEnd('/');
+
+        string path = pathWithQuery ?? "";
+        if (!path.StartsWith("/")) path = "/" + path;
+
+        string relative = $"{prefix}{path}"; // /inventory/items/?...
+
+        // se baseUrl estiver vazio -> URL relativa (recomendado)
+        if (string.IsNullOrWhiteSpace(baseUrl))
+            return relative;
+
+        return baseUrl.TrimEnd('/') + relative;
+    }
+
     private IEnumerator GetItems(string url, Action<List<StorageRowDTO>> onSuccess, Action<string> onError)
     {
         using var req = UnityWebRequest.Get(url);
-
-        if (string.IsNullOrEmpty(jwtToken))
-        {
-            string msg = "[StorageRepository] jwtToken vazio.";
-            Debug.LogError(msg);
-            onError?.Invoke(msg);
-            yield break;
-        }
-
-        req.SetRequestHeader("Authorization", "Bearer " + jwtToken);
         req.SetRequestHeader("Accept", "application/json");
+        // NÃO meter Authorization (reverse proxy trata da auth)
 
         yield return req.SendWebRequest();
 
@@ -85,13 +104,10 @@ public class StorageRepository : MonoBehaviour
         }
 
         Debug.Log($"[StorageRepository] Parsed rows = {rows.Count}");
-        if (rows.Count > 0)
-            Debug.Log($"[StorageRepository] First row: sec={rows[0].location.section} shelf={rows[0].location.shelf} area={rows[0].location.area} carId={rows[0].carId}");
-
         onSuccess?.Invoke(rows);
     }
 
-    // Ignorar por enquanto
+    // (mantém como estava)
     public IEnumerator GetStorageForCar(string carId, Action<List<StorageRowDTO>> onSuccess, Action<string> onError)
     {
         return GetAllStorage(
@@ -122,8 +138,6 @@ public class StorageRepository : MonoBehaviour
         public string car_project_name;
 
         public int segmentation_session_id;
-
-        
         public List<string> segmentation_mask_ids;
 
         public string created_at;

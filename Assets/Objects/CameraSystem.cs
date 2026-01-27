@@ -21,11 +21,9 @@ namespace Objects
         [SerializeField] private Vector2 warehouseBoundsX = new Vector2(0, 0);
         [SerializeField] private Vector2 warehouseBoundsZ = new Vector2(0, 0);
 
-
         [Header("Warehouse Focus")]
-        [SerializeField] private float warehouseFocusHeight = 1.7f;  // altura dos olhos
+        [SerializeField] private float warehouseFocusHeight = 1.7f;   // altura dos olhos
         [SerializeField] private float warehouseFocusDistance = 3.0f; // distância à frente da estante
-
 
         private Vector2 activeBoundsX;
         private Vector2 activeBoundsZ;
@@ -45,15 +43,47 @@ namespace Objects
         private readonly float spaceKeyCooldown = 1f;
 
         [Header("Warehouse Snap Turn")]
-         private float snapTurnAngle = 90f;
-         private float snapTurnDuration = 0.10f;
-         private float snapTurnCooldown = 0.15f;
+        private float snapTurnAngle = 90f;
+        private float snapTurnDuration = 0.10f;
+        private float snapTurnCooldown = 0.15f;
 
         [SerializeField] private AnimationCurve snapTurnEase = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
 
-
         private bool isTurning = false;
         private float lastSnapTurnTime = -999f;
+
+        // =========================================================
+        // ADDED: Top Placement mode (reusa cam2 existente)
+        // - bloqueia Space (não troca cam)
+        // - mantém WASD a mover (bounds do armazém)
+        // - desliga rotação (Q/E ficam livres para a section)
+        // - restaura cam e bounds no fim
+        // =========================================================
+        private bool inTopPlacementMode = false;
+        private bool rotationInputEnabled = true;
+        private CinemachineVirtualCamera camBeforeTopPlacement;
+
+        // ===== ADDED: Top View positioning =====
+        [Header("Top View Placement Tuning")]
+        [SerializeField] private Transform topViewAnchor;      // Empty no centro/teto da warehouse
+        [SerializeField] private float topViewHeightOffset = 0f;
+        [SerializeField] private bool forceTopViewLookDown = true;
+
+        private Vector3 cam2SavedPos;
+        private Quaternion cam2SavedRot;
+        private bool cam2PoseSaved = false;
+        // ===== ADDED: Top Placement height control (cam2 Transposer) =====
+        [Header("Top Placement (cam2 Transposer)")]
+        [SerializeField] private float topPlacementHeight = 20f;   // altura (Y) do FollowOffset durante placement
+        [SerializeField] private Vector3 topPlacementCenter = new Vector3(513f, 0f, -326f); // centro base do top view (x,z)
+
+        private CinemachineTransposer cam2Transposer;
+        private Vector3 cam2FollowOffsetOriginal;
+        private bool cam2OffsetSaved = false;
+        // ================================================================
+
+        // =======================================
+
 
         private void Update()
         {
@@ -68,6 +98,9 @@ namespace Objects
         public void SwicthCameras()
         {
             if (inWarehouseMode) return;
+
+            // ADDED: durante placement não deixar trocar cams com Space
+            if (inTopPlacementMode) return;
 
             if (Input.GetKey(KeyCode.Space) && !spaceKeyPressed)
             {
@@ -107,6 +140,11 @@ namespace Objects
 
             activeBoundsX = worldBoundsX;
             activeBoundsZ = worldBoundsZ;
+
+            // ADDED: cache do transposer da cam2
+            if (cam2 != null)
+                cam2Transposer = cam2.GetCinemachineComponent<CinemachineTransposer>();
+
         }
 
         private void OnDisable()
@@ -157,6 +195,12 @@ namespace Objects
 
         private void HandleCameraRotation()
         {
+            // ADDED: se desligarmos rotação (placement), não mexe aqui
+            if (!rotationInputEnabled) return;
+
+            // ADDED: também não rodar em top placement (Q/E são da section)
+            if (inTopPlacementMode) return;
+
             if (inWarehouseMode)
             {
                 HandleWarehouseSnapTurn();
@@ -219,7 +263,6 @@ namespace Objects
 
             isTurning = false;
         }
-
 
         private void HandleCameraZoom()
         {
@@ -292,7 +335,7 @@ namespace Objects
         public void FocusFrontOfSection(Transform sectionRoot)
         {
             if (sectionRoot == null) return;
-            
+
             Vector3 forward = sectionRoot.forward;
             forward.y = 0f;
             if (forward.sqrMagnitude < 0.001f) forward = Vector3.forward;
@@ -309,6 +352,111 @@ namespace Objects
                 transform.rotation = Quaternion.LookRotation(lookDir.normalized, Vector3.up);
         }
 
+        // =========================================================
+        // ADDED METHODS (para placement / edit placement)
+        // =========================================================
 
+        /// <summary>
+        /// Chamar ao clicar no "+" ou "Move Section".
+        /// Troca para top view (cam2), ativa bounds do armazém,
+        /// e desliga rotação para Q/E ficarem livres para a section.
+        /// </summary>
+        public void EnterTopPlacementView()
+        {
+            if (inTopPlacementMode) return;
+
+            camBeforeTopPlacement = cam;
+
+            inTopPlacementMode = true;
+
+            // WASD continua a mexer, mas dentro do armazém
+            activeBoundsX = warehouseBoundsX;
+            activeBoundsZ = warehouseBoundsZ;
+
+            // guardar pose original da cam2 (uma vez)
+            if (cam2 != null && !cam2PoseSaved)
+            {
+                cam2SavedPos = cam2.transform.position;
+                cam2SavedRot = cam2.transform.rotation;
+                cam2PoseSaved = true;
+            }
+
+            // mover cam2 "para cima" da warehouse
+            if (cam2 != null && topViewAnchor != null)
+            {
+                cam2.transform.position = topViewAnchor.position + Vector3.up * topViewHeightOffset;
+
+                if (forceTopViewLookDown)
+                    cam2.transform.rotation = Quaternion.Euler(90f, cam2.transform.eulerAngles.y, 0f);
+            }
+            // ADDED: posicionar a rig (CameraSystem) em cima da warehouse (x,z)
+            // isto controla o “centro” do top view porque cam2 segue este transform
+            transform.position = new Vector3(topPlacementCenter.x, transform.position.y, topPlacementCenter.z);
+
+            // ADDED: ajustar altura via Transposer FollowOffset
+            if (cam2Transposer != null && !cam2OffsetSaved)
+            {
+                cam2FollowOffsetOriginal = cam2Transposer.m_FollowOffset;
+                cam2OffsetSaved = true;
+            }
+
+            if (cam2Transposer != null)
+            {
+                var off = cam2Transposer.m_FollowOffset;
+                off.y = topPlacementHeight;      // controla a “altura” real
+                cam2Transposer.m_FollowOffset = off;
+            }
+
+
+            // reusar o top view já existente
+            SwitchToTopCam();
+
+            // liberta Q/E para o placement (câmara não roda)
+            rotationInputEnabled = false;
+        }
+
+        /// <summary>
+        /// Chamar ao clicar Save/Cancel do placement.
+        /// Restaura a cam anterior e bounds do mundo, e reativa rotação.
+        /// </summary>
+        public void ExitTopPlacementViewRestore()
+        {
+            if (!inTopPlacementMode) return;
+
+            inTopPlacementMode = false;
+
+            // volta a permitir rotação normal
+            rotationInputEnabled = true;
+
+            // volta aos bounds normais do mundo
+            activeBoundsX = worldBoundsX;
+            activeBoundsZ = worldBoundsZ;
+
+            // restaurar pose original da cam2
+            if (cam2 != null && cam2PoseSaved)
+            {
+                cam2.transform.position = cam2SavedPos;
+                cam2.transform.rotation = cam2SavedRot;
+                cam2PoseSaved = false;
+            }
+            // ADDED: restaurar FollowOffset original da cam2
+            if (cam2Transposer != null && cam2OffsetSaved)
+            {
+                cam2Transposer.m_FollowOffset = cam2FollowOffsetOriginal;
+                cam2OffsetSaved = false;
+            }
+
+
+            // restaurar camera anterior (cam1/cam2/etc)
+            if (camBeforeTopPlacement != null)
+            {
+                CameraSwitcher.switchCamera(camBeforeTopPlacement);
+                cam = camBeforeTopPlacement;
+            }
+
+            camBeforeTopPlacement = null;
+        }
+
+        public bool IsInTopPlacementView() => inTopPlacementMode;
     }
 }
