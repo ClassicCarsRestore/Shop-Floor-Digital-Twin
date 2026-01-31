@@ -18,8 +18,8 @@ namespace API
         public const string OWNER = "owner";
 
         //private const string apiUrl = "http://194.210.120.34:5000/api";
-        //private const string apiUrl = "https://charterturinmonitor.raimundobranco.com/api";
-        private const string apiUrl = "/api";
+        private const string apiUrl = "https://charterturinmonitor.raimundobranco.com/api";
+        //private const string apiUrl = "/api";
         private string role;
         private string securityToken;
         public string lastCarLocation;

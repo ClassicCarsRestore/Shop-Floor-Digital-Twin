@@ -157,7 +157,7 @@ public class WarehouseEditPanel : MonoBehaviour
     {
         if (current == null) return;
 
-        // continua sem WASD/EQ (porque está selecionado)
+       
         SetEditButtonsInteractable(false);
 
         if (remodelController != null)

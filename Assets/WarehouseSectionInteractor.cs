@@ -6,7 +6,7 @@ public class WarehouseSectionInteractor : MonoBehaviour
     [SerializeField] private LayerMask sectionMask;
     [SerializeField] private WarehouseSectionSelection selection;
     [SerializeField] private SectionRemodelController remodelController;
-    [SerializeField] private SectionPlacementController placementController; // ✅ add
+    [SerializeField] private SectionPlacementController placementController; 
 
     public bool IsActive { get; set; } = false;
 
@@ -16,21 +16,21 @@ public class WarehouseSectionInteractor : MonoBehaviour
     {
         if (!IsActive) return;
 
-        // ✅ se estiver a remodelar -> nada
+        //  se estiver a remodelar -> nada
         if (remodelController != null && remodelController.IsRemodeling)
         {
             ClearHover();
             return;
         }
 
-        // ✅ se estiver a colocar/mover -> nada
+        //  se estiver a colocar/mover -> nada
         if (placementController != null && placementController.IsPlacing)
         {
             ClearHover();
             return;
         }
 
-        // ✅ se estiver em "editing" (há uma section selecionada) -> nada
+        //  se estiver em "editing" (há uma section selecionada) -> nada
         if (selection != null && selection.IsEditing)
         {
             ClearHover();
