@@ -7,53 +7,40 @@ using Newtonsoft.Json;
 
 public class StorageRepository : MonoBehaviour
 {
-    [Header("API (Reverse Proxy)")]
-    [Tooltip("Deixa vazio para usar URL relativa (recomendado em WebGL na VM). Ex: ''")]
-    [SerializeField] private string baseUrl = "";
-
-    [Tooltip("Prefixo protegido pelo reverse proxy (Auth via Authentik). Normalmente /inventory")]
-    [SerializeField] private string inventoryPrefix = "/inventory";
-
-    [Tooltip("Endpoint do IMS. No Swagger é /items/")]
-    [SerializeField] private string itemsPath = "/items/";
-
-    [Header("Paging")]
-    [SerializeField] private int skip = 0;
-    [SerializeField] private int limit = 50;
+    // Chamada relativa ao teu site -> Caddy -> Authentik -> reverse_proxy
+    private const string ItemsUrl = "/inventory/items/?skip=0&limit=50";
 
     public IEnumerator GetAllStorage(Action<List<StorageRowDTO>> onSuccess, Action<string> onError)
     {
-        // exemplo final: /inventory/items/?skip=0&limit=50
-        string url = BuildUrl($"{itemsPath}?skip={skip}&limit={limit}");
+        Debug.Log("[StorageRepository] GET " + ItemsUrl);
+        yield return GetItems(ItemsUrl, onSuccess, onError);
+    }
+
+    // ✅ AGORA: endpoint leve por project_id (carro)
+    // Swagger: GET /projects/{project_id}/locations
+    public IEnumerator GetStorageForCar(string carId, Action<List<StorageRowDTO>> onSuccess, Action<string> onError)
+    {
+        if (string.IsNullOrWhiteSpace(carId))
+        {
+            onError?.Invoke("[StorageRepository] carId vazio.");
+            yield break;
+        }
+
+        string url = $"/inventory/projects/{UnityWebRequest.EscapeURL(carId)}/locations";
         Debug.Log("[StorageRepository] GET " + url);
 
-        yield return GetItems(url, onSuccess, onError);
+        yield return GetProjectLocations(url, carId, onSuccess, onError);
     }
 
-    private string BuildUrl(string pathWithQuery)
-    {
-        // garante que temos /inventory + /items/... bem formatado
-        string prefix = inventoryPrefix ?? "";
-        if (!prefix.StartsWith("/")) prefix = "/" + prefix;
-        prefix = prefix.TrimEnd('/');
-
-        string path = pathWithQuery ?? "";
-        if (!path.StartsWith("/")) path = "/" + path;
-
-        string relative = $"{prefix}{path}"; // /inventory/items/?...
-
-        // se baseUrl estiver vazio -> URL relativa (recomendado)
-        if (string.IsNullOrWhiteSpace(baseUrl))
-            return relative;
-
-        return baseUrl.TrimEnd('/') + relative;
-    }
+    // -----------------------------
+    // Internals
+    // -----------------------------
 
     private IEnumerator GetItems(string url, Action<List<StorageRowDTO>> onSuccess, Action<string> onError)
     {
         using var req = UnityWebRequest.Get(url);
         req.SetRequestHeader("Accept", "application/json");
-        // NÃO meter Authorization (reverse proxy trata da auth)
+        // NÃO meter Authorization — Authentik/Caddy trata disso
 
         yield return req.SendWebRequest();
 
@@ -66,7 +53,7 @@ public class StorageRepository : MonoBehaviour
             yield break;
         }
 
-        var json = req.downloadHandler.text;
+        string json = req.downloadHandler.text;
 
         List<WarehouseItemDTO> items;
         try
@@ -83,7 +70,6 @@ public class StorageRepository : MonoBehaviour
         }
 
         var rows = new List<StorageRowDTO>();
-
         if (items != null)
         {
             foreach (var it in items)
@@ -107,18 +93,71 @@ public class StorageRepository : MonoBehaviour
         onSuccess?.Invoke(rows);
     }
 
-    // (mantém como estava)
-    public IEnumerator GetStorageForCar(string carId, Action<List<StorageRowDTO>> onSuccess, Action<string> onError)
+    private IEnumerator GetProjectLocations(
+        string url,
+        string projectId,
+        Action<List<StorageRowDTO>> onSuccess,
+        Action<string> onError)
     {
-        return GetAllStorage(
-            (allRows) =>
+        using var req = UnityWebRequest.Get(url);
+        req.SetRequestHeader("Accept", "application/json");
+        // NÃO meter Authorization — Authentik/Caddy trata disso
+
+        yield return req.SendWebRequest();
+
+        if (req.result != UnityWebRequest.Result.Success)
+        {
+            string body = req.downloadHandler != null ? req.downloadHandler.text : "";
+            string msg = $"[StorageRepository] API falhou: {req.error} | HTTP={(int)req.responseCode} | Body={body}";
+            Debug.LogWarning(msg);
+            onError?.Invoke(msg);
+            yield break;
+        }
+
+        string json = req.downloadHandler.text;
+
+        List<ProjectLocationDTO> locs;
+        try
+        {
+            locs = JsonConvert.DeserializeObject<List<ProjectLocationDTO>>(json);
+        }
+        catch (Exception e)
+        {
+            string msg = "[StorageRepository] Erro a fazer parse do JSON (/projects/{id}/locations): " + e.Message;
+            Debug.LogError(msg);
+            Debug.LogError("JSON recebido: " + json);
+            onError?.Invoke(msg);
+            yield break;
+        }
+
+        var rows = new List<StorageRowDTO>();
+        if (locs != null)
+        {
+            foreach (var l in locs)
             {
-                var filtered = allRows.FindAll(r => r.carId == carId);
-                onSuccess?.Invoke(filtered);
-            },
-            onError
-        );
+                if (l == null || l.warehouse_location == null) continue;
+
+                rows.Add(new StorageRowDTO
+                {
+                    // highlight usa carId para bater com o que foi pedido
+                    carId = projectId,
+                    location = new StorageLocationDTO
+                    {
+                        section = l.warehouse_location.section,
+                        shelf = l.warehouse_location.shelf,
+                        area = l.warehouse_location.area
+                    }
+                });
+            }
+        }
+
+        Debug.Log($"[StorageRepository] Parsed car locations rows = {rows.Count} (project_id={projectId})");
+        onSuccess?.Invoke(rows);
     }
+
+    // -----------------------------
+    // DTOs
+    // -----------------------------
 
     [Serializable]
     private class WarehouseItemDTO
@@ -142,6 +181,15 @@ public class StorageRepository : MonoBehaviour
 
         public string created_at;
         public string updated_at;
+    }
+
+    // DTO do endpoint /projects/{id}/locations (exemplo do swagger)
+    [Serializable]
+    private class ProjectLocationDTO
+    {
+        public int id;
+        public string name;
+        public WarehouseLocationDTO warehouse_location;
     }
 
     [Serializable]

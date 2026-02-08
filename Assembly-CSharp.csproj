@@ -71,6 +71,7 @@
     <Compile Include="Assets\WarehouseSectionInteractor.cs" />
     <Compile Include="Assets\HeatmapZoneTag.cs" />
     <Compile Include="Assets\UI\ProjectsList.cs" />
+    <Compile Include="Assets\EnergyPanelController.cs" />
     <Compile Include="Assets\UI\CarInfoDetailPanel.cs" />
     <Compile Include="Assets\SimpleDatePicker.cs" />
     <Compile Include="Assets\WarehouseViewController.cs" />
@@ -116,6 +117,7 @@
     <Compile Include="Assets\SectionRemodelController.cs" />
     <Compile Include="Assets\Objects\ColorPickerLocation.cs" />
     <Compile Include="Assets\HighlightTarget.cs" />
+    <Compile Include="Assets\EnergyPanelToggle.cs" />
     <Compile Include="Assets\ColorPicker\Scripts\InputChannel.cs" />
     <Compile Include="Assets\ColorPicker\Scripts\PointerTrackerArea.cs" />
     <Compile Include="Assets\ColorPicker\Scripts\InputColorChannels.cs" />
