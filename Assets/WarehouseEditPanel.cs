@@ -103,10 +103,15 @@ public class WarehouseEditPanel : MonoBehaviour
 
     private void DeselectAndClose()
     {
-        // isto vai: esconder este painel + reativar movement (via selection.ClearSelection)
+        // restaurar pose da câmara
+        if (cameraSystem != null)
+            cameraSystem.RestoreAfterSectionFocus();
+
+        // isto vai: esconder este painel + reativar movement
         if (selection != null) selection.ClearSelection();
-        else Hide(); // fallback
+        else Hide();
     }
+
 
     private void EditPlacement()
     {

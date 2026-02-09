@@ -82,7 +82,16 @@ namespace Objects
         private bool cam2OffsetSaved = false;
         // ================================================================
 
+        // --- Focus restore ---
+        private bool inSectionFocus = false;
+        private Vector3 savedRigPos;
+        private Quaternion savedRigRot;
+
+        private Vector3 savedFPPos;
+        private Quaternion savedFPRot;
+
         // =======================================
+        public bool IsInWarehouseMode => inWarehouseMode;
 
 
         private void Update()
@@ -336,21 +345,115 @@ namespace Objects
         {
             if (sectionRoot == null) return;
 
+            // guarda pose atual (uma vez) para poderes restaurar ao sair
+            if (!inSectionFocus)
+            {
+                inSectionFocus = true;
+                savedRigPos = transform.position;
+                savedRigRot = transform.rotation;
+
+                if (camWarehouseFP != null)
+                {
+                    savedFPPos = camWarehouseFP.transform.position;
+                    savedFPRot = camWarehouseFP.transform.rotation;
+                }
+            }
+
+            // 1) alvo = centro visual da section (bounds)
+            Vector3 target = sectionRoot.position;
+            var rends = sectionRoot.GetComponentsInChildren<Renderer>(true);
+            if (rends != null && rends.Length > 0)
+            {
+                Bounds b = rends[0].bounds;
+                for (int i = 1; i < rends.Length; i++) b.Encapsulate(rends[i].bounds);
+                target = b.center;
+            }
+
+            // 2) forward da section projetado no chão
             Vector3 forward = sectionRoot.forward;
             forward.y = 0f;
-            if (forward.sqrMagnitude < 0.001f) forward = Vector3.forward;
+            if (forward.sqrMagnitude < 0.0001f) forward = Vector3.forward;
             forward.Normalize();
 
-            Vector3 targetPos = sectionRoot.position - forward * warehouseFocusDistance;
-            targetPos.y = warehouseFocusHeight; // altura fixa
+            // 3) candidata A: "à frente"
+            Vector3 camPosA = target - forward * warehouseFocusDistance;
+            camPosA.y = warehouseFocusHeight;
 
-            transform.position = targetPos;
+            // 4) candidata B: "lado contrário" (se a A ficar fora dos bounds)
+            Vector3 camPosB = target + forward * warehouseFocusDistance;
+            camPosB.y = warehouseFocusHeight;
 
-            Vector3 lookDir = sectionRoot.position - transform.position;
+            // escolher a melhor posição
+            Vector3 camPos = camPosA;
+            if (!IsInsideWarehouseBounds(camPosA))
+            {
+                if (IsInsideWarehouseBounds(camPosB))
+                    camPos = camPosB;
+                else
+                    camPos = ClampToWarehouseBounds(camPosA); // fallback
+            }
+
+            // 5) rotação: só YAW (sem inclinação)
+            Vector3 lookDir = target - camPos;
             lookDir.y = 0f;
-            if (lookDir.sqrMagnitude > 0.001f)
-                transform.rotation = Quaternion.LookRotation(lookDir.normalized, Vector3.up);
+            if (lookDir.sqrMagnitude < 0.0001f) lookDir = forward;
+
+            Quaternion camRot = Quaternion.LookRotation(lookDir.normalized, Vector3.up);
+
+            // força roll=0 e pitch=0
+            Vector3 e = camRot.eulerAngles;
+            camRot = Quaternion.Euler(0f, e.y, 0f);
+
+            // aplica no rig
+            transform.SetPositionAndRotation(camPos, camRot);
+
+            // aplica também na vcam FP (se estiveres a usar)
+            if (camWarehouseFP != null)
+                camWarehouseFP.transform.SetPositionAndRotation(camPos, camRot);
         }
+
+        private bool IsInsideWarehouseBounds(Vector3 pos)
+        {
+            // margem para não colar na parede / evitar edge cases
+            const float margin = 0.05f;
+
+            return pos.x >= warehouseBoundsX.x + margin &&
+                   pos.x <= warehouseBoundsX.y - margin &&
+                   pos.z >= warehouseBoundsZ.x + margin &&
+                   pos.z <= warehouseBoundsZ.y - margin;
+        }
+
+        private Vector3 ClampToWarehouseBounds(Vector3 pos)
+        {
+            const float margin = 0.05f;
+
+            pos.x = Mathf.Clamp(pos.x, warehouseBoundsX.x + margin, warehouseBoundsX.y - margin);
+            pos.z = Mathf.Clamp(pos.z, warehouseBoundsZ.x + margin, warehouseBoundsZ.y - margin);
+            return pos;
+        }
+
+
+        public void RestoreAfterSectionFocus()
+        {
+            if (!inSectionFocus) return;
+
+            inSectionFocus = false;
+
+            transform.SetPositionAndRotation(savedRigPos, savedRigRot);
+
+            if (camWarehouseFP != null)
+                camWarehouseFP.transform.SetPositionAndRotation(savedFPPos, savedFPRot);
+
+            // safety: manter bounds corretos
+            if (inWarehouseMode)
+            {
+                activeBoundsX = warehouseBoundsX;
+                activeBoundsZ = warehouseBoundsZ;
+            }
+        }
+
+
+
 
         // =========================================================
         // ADDED METHODS (para placement / edit placement)
@@ -429,8 +532,17 @@ namespace Objects
             rotationInputEnabled = true;
 
             // volta aos bounds normais do mundo
-            activeBoundsX = worldBoundsX;
-            activeBoundsZ = worldBoundsZ;
+            if (inWarehouseMode)
+            {
+                activeBoundsX = warehouseBoundsX;
+                activeBoundsZ = warehouseBoundsZ;
+            }
+            else
+            {
+                activeBoundsX = worldBoundsX;
+                activeBoundsZ = worldBoundsZ;
+            }
+
 
             // restaurar pose original da cam2
             if (cam2 != null && cam2PoseSaved)

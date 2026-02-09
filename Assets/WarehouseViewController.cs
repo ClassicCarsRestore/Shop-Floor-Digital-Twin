@@ -8,14 +8,16 @@ public class WarehouseViewController : MonoBehaviour
     [Header("References")]
     [SerializeField] private CameraSystem cameraSystem;
     [SerializeField] private StorageRepository storageRepository;
-  
+    [SerializeField] private Roof roof;
 
 
-    
+
     private List<StorageRowDTO> lastAllRows = new List<StorageRowDTO>();
 
     public void OpenWarehouseAll()
     {
+        if (roof != null) roof.EnsureFirstFloorOn();
+
         cameraSystem.EnterWarehouseFirstPerson();
         WarehouseHUD.Instance.Show();
 
@@ -36,6 +38,8 @@ public class WarehouseViewController : MonoBehaviour
 
     public void OpenWarehouseForCar(string carId)
     {
+        if (roof != null) roof.EnsureFirstFloorOn();
+
         if (string.IsNullOrEmpty(carId))
         {
             Debug.LogWarning("[WarehouseViewController] carId vazio");
