@@ -1,6 +1,7 @@
-﻿using System.Collections;
-using Cinemachine;
+﻿using Cinemachine;
 using Models;
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Objects
@@ -46,6 +47,15 @@ namespace Objects
         private float snapTurnAngle = 90f;
         private float snapTurnDuration = 0.10f;
         private float snapTurnCooldown = 0.15f;
+
+        [Header("Warehouse Focus Occlusion (Hide)")]
+        [SerializeField] private LayerMask sectionMask;      // mesma layer das sections
+        [SerializeField] private float occluderMargin = 0.05f;
+
+        // --- Occlusion Hide ---
+        private readonly HashSet<ShelfSection> hiddenOccluders = new HashSet<ShelfSection>();
+        private ShelfSection focusedSection;
+
 
         [SerializeField] private AnimationCurve snapTurnEase = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
 
@@ -102,6 +112,11 @@ namespace Objects
             HandleCameraMovement();
             HandleCameraRotation();
             HandleCameraZoom();
+
+            // enquanto estiveres em foco, vai ajustando o que tapa a vista
+            if (inSectionFocus)
+                UpdateOccludersHide();
+
         }
 
         public void SwicthCameras()
@@ -410,6 +425,10 @@ namespace Objects
             // aplica também na vcam FP (se estiveres a usar)
             if (camWarehouseFP != null)
                 camWarehouseFP.transform.SetPositionAndRotation(camPos, camRot);
+
+            focusedSection = sectionRoot.GetComponentInParent<ShelfSection>();
+            UpdateOccludersHide();
+
         }
 
         private bool IsInsideWarehouseBounds(Vector3 pos)
@@ -444,6 +463,10 @@ namespace Objects
             if (camWarehouseFP != null)
                 camWarehouseFP.transform.SetPositionAndRotation(savedFPPos, savedFPRot);
 
+            RestoreHiddenOccluders();
+            focusedSection = null;
+
+
             // safety: manter bounds corretos
             if (inWarehouseMode)
             {
@@ -451,6 +474,79 @@ namespace Objects
                 activeBoundsZ = warehouseBoundsZ;
             }
         }
+
+        private void UpdateOccludersHide()
+        {
+            if (focusedSection == null) return;
+
+            Vector3 camPos = camWarehouseFP != null ? camWarehouseFP.transform.position : transform.position;
+
+            // target = centro visual da focused section
+            Vector3 target = focusedSection.transform.position;
+            var rends = focusedSection.GetComponentsInChildren<Renderer>(true);
+            if (rends != null && rends.Length > 0)
+            {
+                Bounds b = rends[0].bounds;
+                for (int i = 1; i < rends.Length; i++) b.Encapsulate(rends[i].bounds);
+                target = b.center;
+            }
+
+            Vector3 dir = target - camPos;
+            float dist = dir.magnitude;
+            if (dist < 0.01f) return;
+            dir /= dist;
+
+            var hits = Physics.RaycastAll(
+                camPos,
+                dir,
+                Mathf.Max(0f, dist - occluderMargin),
+                sectionMask,
+                QueryTriggerInteraction.Ignore);
+
+            var newOccluders = new HashSet<ShelfSection>();
+
+            for (int i = 0; i < hits.Length; i++)
+            {
+                var col = hits[i].collider;
+                if (col == null) continue;
+
+                var sec = col.GetComponentInParent<ShelfSection>();
+                if (sec == null) continue;
+                if (sec == focusedSection) continue;
+
+                newOccluders.Add(sec);
+            }
+
+            // reativa os que deixaram de tapar
+            foreach (var old in hiddenOccluders)
+            {
+                if (old == null) continue;
+                if (!newOccluders.Contains(old))
+                    old.gameObject.SetActive(true);
+            }
+
+            // desativa os novos que tapam
+            foreach (var sec in newOccluders)
+            {
+                if (sec == null) continue;
+                if (!hiddenOccluders.Contains(sec))
+                    sec.gameObject.SetActive(false);
+            }
+
+            hiddenOccluders.Clear();
+            foreach (var s in newOccluders) hiddenOccluders.Add(s);
+        }
+
+        private void RestoreHiddenOccluders()
+        {
+            foreach (var sec in hiddenOccluders)
+            {
+                if (sec != null)
+                    sec.gameObject.SetActive(true);
+            }
+            hiddenOccluders.Clear();
+        }
+
 
 
 
