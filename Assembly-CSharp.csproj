@@ -60,6 +60,7 @@
     <Analyzer Include="C:\Program Files\Unity\Hub\Editor\2022.3.13f1\Editor\Data\Tools\Unity.SourceGenerators\Unity.Properties.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets\ShelfAreasBuilder.cs" />
     <Compile Include="Assets\LegendItemUI.cs" />
     <Compile Include="Assets\HeatmapTooltipUI.cs" />
     <Compile Include="Assets\HeatmapButtonLauncher.cs" />
@@ -108,6 +109,7 @@
     <Compile Include="Assets\WarehouseSectionSelection.cs" />
     <Compile Include="Assets\Objects\ColorPickerCar.cs" />
     <Compile Include="Assets\Objects\Roof.cs" />
+    <Compile Include="Assets\ShelfAreasRow.cs" />
     <Compile Include="Assets\StorageRepository.cs" />
     <Compile Include="Assets\StorageDTOs.cs" />
     <Compile Include="Assets\SectionPlacementController.cs" />

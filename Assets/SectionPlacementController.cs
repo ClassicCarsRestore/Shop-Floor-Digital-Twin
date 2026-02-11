@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
@@ -676,15 +676,40 @@ public class SectionPlacementController : MonoBehaviour
 
         ClearGhostVisual();
 
+        // Novo placement (criação de section)
         if (!isEditing)
         {
+            ShelfSection sec = null;
+
             if (WarehouseManager.Instance != null)
-                WarehouseManager.Instance.AddSectionRuntime(ghostInstance);
+            {
+                // AddSectionRuntime devolve a ShelfSection criada – usa o retorno!
+                sec = WarehouseManager.Instance.AddSectionRuntime(ghostInstance);
+            }
+
+            // Inicializa shelves + áreas default apenas se a section foi criada com sucesso
+            if (sec != null)
+            {
+                var shelvesCtrl = sec.GetComponent<ShelfSectionShelvesController>();
+                if (shelvesCtrl != null)
+                {
+                    // garante que a lista Section.Shelves está alinhada com a hierarquia
+                    shelvesCtrl.RebuildShelves();
+                }
+
+                // Cria áreas default (ex.: 6) em TODAS as shelves iniciais da section
+                foreach (var shelf in sec.Shelves)
+                {
+                    if (shelf == null) continue;
+                    ShelfAreasBuilder.RebuildAreas(shelf, 6);
+                }
+            }
 
             EndPlacement(keepObject: true);
             return;
         }
 
+        // Edição de placement de uma section existente
         var finishedSection = ghostSection;
         EndPlacement(keepObject: true);
         OnEditPlacementFinished?.Invoke(finishedSection, true);

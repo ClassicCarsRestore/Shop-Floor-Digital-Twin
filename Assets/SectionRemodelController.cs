@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -38,6 +39,21 @@ public class SectionRemodelController : MonoBehaviour
     [SerializeField] private Color validTint = new Color(0f, 1f, 0f, 0.35f);
     [SerializeField] private Color invalidTint = new Color(1f, 0f, 0f, 0.35f);
 
+
+    [Header("UI - Areas Per Shelf")]
+    [SerializeField] private Transform areasListContent;
+    [SerializeField] private ShelfAreasRow rowPrefab; // script simples no prefab da linha
+
+    [Header("Area Limits")]
+    [SerializeField] private int minAreas = 1;
+    [SerializeField] private int maxAreas = 24;
+
+  
+
+    // estado editável (por shelf index)
+    private readonly List<int> areaCountPerShelf = new List<int>();
+    private readonly List<ShelfAreasRow> spawnedRows = new List<ShelfAreasRow>();
+
     private bool canSave = true;
 
     private Renderer[] sectionRenderers;
@@ -57,6 +73,9 @@ public class SectionRemodelController : MonoBehaviour
     private Vector3 originalScale;
 
     private bool isSyncingUI = false;
+
+    private const float RowHeight = 50f;
+    private const float RowSpacing = 10f;
 
     private void Awake()
     {
@@ -96,6 +115,10 @@ public class SectionRemodelController : MonoBehaviour
 
         current = section;
         originalScale = current.transform.localScale;
+
+        BuildAreasRowsFromSection(section);
+
+
         sectionCollider = current.GetComponentInChildren<BoxCollider>();
         sectionRenderers = current.GetComponentsInChildren<Renderer>(true);
 
@@ -165,12 +188,94 @@ public class SectionRemodelController : MonoBehaviour
         ValidateAndApplyFeedback();
     }
 
+
+
+    
+
+    private void BuildAreasRowsFromSection(ShelfSection section)
+    {
+        ClearRows();
+        areaCountPerShelf.Clear();
+
+        if (section == null || section.Shelves == null) return;
+
+        for (int i = 0; i < section.Shelves.Count; i++)
+        {
+            var shelf = section.Shelves[i];
+            int count = shelf != null && shelf.Areas != null ? shelf.Areas.Count : 1;
+            count = Mathf.Clamp(count, minAreas, maxAreas);
+            areaCountPerShelf.Add(count);
+
+            var row = Instantiate(rowPrefab);
+            row.transform.SetParent(areasListContent, false);
+
+            // guarda referência para depois conseguir limpar em ClearRows()
+            spawnedRows.Add(row);
+
+            var rt = (RectTransform)row.transform;
+
+            // garante anchors/pivot corretos (top-left)
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(0f, 1f);
+            rt.pivot = new Vector2(0f, 1f);
+
+            // layout manual
+            float rowH = 30f;
+            float spacing = 5f;
+            rt.anchoredPosition = new Vector2(0f, -i * (rowH + spacing));
+            rt.sizeDelta = new Vector2(420f, rowH); // ou usa o width do content
+
+
+            int idx = i;
+
+            row.SetLabel($"Shelf {i + 1}");
+            row.SetCount(areaCountPerShelf[idx]);
+
+            row.OnMinus = () =>
+            {
+                areaCountPerShelf[idx] = Mathf.Max(minAreas, areaCountPerShelf[idx] - 1);
+                row.SetCount(areaCountPerShelf[idx]);
+            };
+
+            row.OnPlus = () =>
+            {
+                areaCountPerShelf[idx] = Mathf.Min(maxAreas, areaCountPerShelf[idx] + 1);
+                row.SetCount(areaCountPerShelf[idx]);
+            };
+        }
+    }
+
+
+
+    private void ClearRows()
+    {
+        for (int i = 0; i < spawnedRows.Count; i++)
+        {
+            if (spawnedRows[i] != null)
+                Destroy(spawnedRows[i].gameObject);
+        }
+        spawnedRows.Clear();
+    }
+
     private void Save()
     {
         if (!IsRemodeling || current == null) return;
         if (!canSave) return;
 
         var sec = current;
+
+        Physics.SyncTransforms();
+
+        // 2) aplicar areas por shelf
+        for (int i = 0; i < current.Shelves.Count; i++)
+        {
+            var shelf = current.Shelves[i];
+            if (shelf == null) continue;
+
+            int desired = (i < areaCountPerShelf.Count) ? areaCountPerShelf[i] : 1;
+            ShelfAreasBuilder.RebuildAreas(shelf, desired);
+        }
+
 
         ClearRemodelVisual();
         End();
@@ -183,6 +288,8 @@ public class SectionRemodelController : MonoBehaviour
 
         if (current != null)
             current.transform.localScale = originalScale;
+
+        Physics.SyncTransforms();
 
         ClearRemodelVisual();
         End();
@@ -202,6 +309,10 @@ public class SectionRemodelController : MonoBehaviour
         sectionCollider = null;
         sectionRenderers = null;
         canSave = true;
+
+        ClearRows();
+        areaCountPerShelf.Clear();
+
     }
 
     private void ValidateAndApplyFeedback()

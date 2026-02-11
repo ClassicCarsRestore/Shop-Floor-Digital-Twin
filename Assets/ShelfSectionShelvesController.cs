@@ -10,7 +10,6 @@ public class ShelfSectionShelvesController : MonoBehaviour
     [Header("Rules")]
     [SerializeField] private int minShelves = 2;
 
-
     private ShelfSection section;
 
     private void Awake()
@@ -48,8 +47,20 @@ public class ShelfSectionShelvesController : MonoBehaviour
         float deltaY = topY - unitBounds.min.y;
         unit.transform.position += new Vector3(0f, deltaY, 0f);
 
+      
+
+
         // 4) reconstruir lista de shelves + IDs
         RebuildShelvesFromHierarchy();
+
+        // 4.5) criar áreas default na shelf nova
+        var newShelf = section.Shelves.Count > 0 ? section.Shelves[section.Shelves.Count - 1] : null;
+        if (newShelf != null)
+        {
+            // escolhe o default que queres (ex.: 6)
+            ShelfAreasBuilder.RebuildAreas(newShelf, 6);
+        }
+
 
         // 5) garantir highlight inclui novos renderers
         RefreshHighlight();
@@ -128,6 +139,10 @@ public class ShelfSectionShelvesController : MonoBehaviour
         }
 
         Debug.Log($"[ShelfSectionShelvesController] Rebuild ok. Shelves={section.Shelves.Count}");
+    }
+    public void RebuildShelves()
+    {
+        RebuildShelvesFromHierarchy();
     }
 
     // -------------------------
