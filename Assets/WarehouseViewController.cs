@@ -8,9 +8,8 @@ public class WarehouseViewController : MonoBehaviour
     [Header("References")]
     [SerializeField] private CameraSystem cameraSystem;
     [SerializeField] private StorageRepository storageRepository;
+    [SerializeField] private WarehouseLayoutController layoutController;
     [SerializeField] private Roof roof;
-
-
 
     private List<StorageRowDTO> lastAllRows = new List<StorageRowDTO>();
 
@@ -21,19 +20,31 @@ public class WarehouseViewController : MonoBehaviour
         cameraSystem.EnterWarehouseFirstPerson();
         WarehouseHUD.Instance.Show();
 
-
-        StartCoroutine(storageRepository.GetAllStorage(
-            onSuccess: (rows) =>
+        if (layoutController != null)
+        {
+            layoutController.LoadLayoutAndThen(() =>
             {
-                lastAllRows = rows ?? new List<StorageRowDTO>();
-                WarehouseManager.Instance.ShowAllStorage(lastAllRows);
-                // sem highlights
-            },
-            onError: (err) =>
-            {
-                Debug.LogWarning("[WarehouseViewController] GetAllStorage error: " + err);
-            }
-        ));
+                StartCoroutine(storageRepository.GetAllStorage(
+                    onSuccess: (rows) =>
+                    {
+                        lastAllRows = rows ?? new List<StorageRowDTO>();
+                        WarehouseManager.Instance.ShowAllStorage(lastAllRows);
+                    },
+                    onError: (err) => Debug.LogWarning("[WarehouseViewController] GetAllStorage error: " + err)
+                ));
+            });
+        }
+        else
+        {
+            StartCoroutine(storageRepository.GetAllStorage(
+                onSuccess: (rows) =>
+                {
+                    lastAllRows = rows ?? new List<StorageRowDTO>();
+                    WarehouseManager.Instance.ShowAllStorage(lastAllRows);
+                },
+                onError: (err) => Debug.LogWarning("[WarehouseViewController] GetAllStorage error: " + err)
+            ));
+        }
     }
 
     public void OpenWarehouseForCar(string carId)
@@ -49,35 +60,56 @@ public class WarehouseViewController : MonoBehaviour
         cameraSystem.EnterWarehouseFirstPerson();
         WarehouseHUD.Instance.Show();
 
-
-        // 1) ALL sem highlight
-        StartCoroutine(storageRepository.GetAllStorage(
-            onSuccess: (allRows) =>
+        if (layoutController != null)
+        {
+            layoutController.LoadLayoutAndThen(() =>
             {
-                lastAllRows = allRows ?? new List<StorageRowDTO>();
-                WarehouseManager.Instance.ShowAllStorage(lastAllRows);
-
-                // 2) Só do carro para highlight
-                StartCoroutine(storageRepository.GetStorageForCar(
-                    carId,
-                    onSuccess: (carRows) =>
+                StartCoroutine(storageRepository.GetAllStorage(
+                    onSuccess: (allRows) =>
                     {
-                        
-                        WarehouseManager.Instance.HighlightCarBoxes(carId, carRows);
+                        lastAllRows = allRows ?? new List<StorageRowDTO>();
+                        WarehouseManager.Instance.ShowAllStorage(lastAllRows);
+
+                        StartCoroutine(storageRepository.GetStorageForCar(
+                            carId,
+                            onSuccess: (carRows) =>
+                            {
+                                WarehouseManager.Instance.HighlightCarBoxes(carId, carRows);
+                            },
+                            onError: (err2) =>
+                            {
+                                Debug.LogWarning("[WarehouseViewController] GetStorageForCar error: " + err2);
+                                WarehouseManager.Instance.HighlightCarBoxes(carId, lastAllRows);
+                            }
+                        ));
                     },
-                    onError: (err2) =>
-                    {
-                        Debug.LogWarning("[WarehouseViewController] GetStorageForCar error: " + err2);
-
-                        
-                        WarehouseManager.Instance.HighlightCarBoxes(carId, lastAllRows);
-                    }
+                    onError: (err) => Debug.LogWarning("[WarehouseViewController] GetAllStorage error: " + err)
                 ));
-            },
-            onError: (err) =>
-            {
-                Debug.LogWarning("[WarehouseViewController] GetAllStorage error: " + err);
-            }
-        ));
+            });
+        }
+        else
+        {
+            StartCoroutine(storageRepository.GetAllStorage(
+                onSuccess: (allRows) =>
+                {
+                    lastAllRows = allRows ?? new List<StorageRowDTO>();
+                    WarehouseManager.Instance.ShowAllStorage(lastAllRows);
+
+                    StartCoroutine(storageRepository.GetStorageForCar(
+                        carId,
+                        onSuccess: (carRows) =>
+                        {
+                            WarehouseManager.Instance.HighlightCarBoxes(carId, carRows);
+                        },
+                        onError: (err2) =>
+                        {
+                            Debug.LogWarning("[WarehouseViewController] GetStorageForCar error: " + err2);
+                            WarehouseManager.Instance.HighlightCarBoxes(carId, lastAllRows);
+                        }
+                    ));
+                },
+                onError: (err) => Debug.LogWarning("[WarehouseViewController] GetAllStorage error: " + err)
+            ));
+        }
     }
 }

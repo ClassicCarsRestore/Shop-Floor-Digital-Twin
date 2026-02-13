@@ -40,7 +40,7 @@ public class StorageRepository : MonoBehaviour
     {
         using var req = UnityWebRequest.Get(url);
         req.SetRequestHeader("Accept", "application/json");
-        // NÃO meter Authorization — Authentik/Caddy trata disso
+        
 
         yield return req.SendWebRequest();
 
@@ -101,7 +101,7 @@ public class StorageRepository : MonoBehaviour
     {
         using var req = UnityWebRequest.Get(url);
         req.SetRequestHeader("Accept", "application/json");
-        // NÃO meter Authorization — Authentik/Caddy trata disso
+        
 
         yield return req.SendWebRequest();
 

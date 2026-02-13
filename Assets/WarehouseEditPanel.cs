@@ -70,12 +70,17 @@ public class WarehouseEditPanel : MonoBehaviour
         current = section;
         gameObject.SetActive(true);
         SetEditButtonsInteractable(true);
+
+        WarehouseHUD.Instance?.EnterEditMode();
+
     }
 
     public void Hide()
     {
         current = null;
         gameObject.SetActive(false);
+
+        WarehouseHUD.Instance?.ExitEditMode();
     }
 
     private void SetEditButtonsInteractable(bool on)
@@ -99,6 +104,9 @@ public class WarehouseEditPanel : MonoBehaviour
         // depois de apagar, limpa seleção (reativa movement e fecha painel)
         if (selection != null) selection.ClearSelection();
         else Hide();
+
+
+        WarehouseHUD.Instance?.ExitEditMode();
     }
 
     private void DeselectAndClose()
@@ -110,6 +118,8 @@ public class WarehouseEditPanel : MonoBehaviour
         // isto vai: esconder este painel + reativar movement
         if (selection != null) selection.ClearSelection();
         else Hide();
+
+        WarehouseHUD.Instance?.ExitEditMode();
     }
 
 
@@ -180,16 +190,15 @@ public class WarehouseEditPanel : MonoBehaviour
 
         
         gameObject.SetActive(false);
+
+        WarehouseHUD.Instance?.EnterEditMode();
     }
 
     private void HandleEditPlacementFinished(ShelfSection section, bool saved)
     {
         if (current != section) return;
+        WarehouseHUD.Instance?.EnterEditMode();
         SetEditButtonsInteractable(true);
-
- 
-          
-
         if (selection != null)
         {
             selection.SelectSection(section); //focar camera + mostrar painel + desativar controls
@@ -217,12 +226,15 @@ public class WarehouseEditPanel : MonoBehaviour
 
         // esconder botões do edit enquanto remodel está aberto
         gameObject.SetActive(false);
+
+        WarehouseHUD.Instance?.EnterEditMode();
     }
 
     private void HandleRemodelFinished(ShelfSection section, bool saved)
     {
         if (current != section) return;
 
+        WarehouseHUD.Instance?.EnterEditMode();
         // voltar ao modo normal de edição: section continua selecionada
         if (selection != null)
         {

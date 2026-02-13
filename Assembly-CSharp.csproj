@@ -61,9 +61,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assets\ShelfAreasBuilder.cs" />
+    <Compile Include="Assets\Warehouse\WarehouseLayoutSerializer.cs" />
+    <Compile Include="Assets\Warehouse\WarehouseLayoutController.cs" />
     <Compile Include="Assets\LegendItemUI.cs" />
     <Compile Include="Assets\HeatmapTooltipUI.cs" />
     <Compile Include="Assets\HeatmapButtonLauncher.cs" />
+    <Compile Include="Assets\Warehouse\WarehouseLayoutRepository.cs" />
     <Compile Include="Assets\UI\AddCar.cs" />
     <Compile Include="Assets\Warehouse\WarehouseManager.cs" />
     <Compile Include="Assets\ShelfSectionShelvesController.cs" />
@@ -95,6 +98,7 @@
     <Compile Include="Assets\UI\CarSlotCreator.cs" />
     <Compile Include="Assets\UI\UIManager.cs" />
     <Compile Include="Assets\Objects\CarObject.cs" />
+    <Compile Include="Assets\Warehouse\WarehouseLayoutDTOs.cs" />
     <Compile Include="Assets\Warehouse\StorageArea.cs" />
     <Compile Include="Assets\UI\CarTimelineController.cs" />
     <Compile Include="Assets\HeatmapModeController.cs" />
@@ -134,6 +138,7 @@
     <None Include="Assets\Warehouse\NewUnlitShader.shader" />
     <None Include="Assets\QuickOutline\Resources\Shaders\OutlineMask.shader" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Surface-Mobile.shader" />
+    <None Include="Assets\Warehouse\README_LAYOUT_SETUP.txt" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Surface.shader" />
     <None Include="Assets\TextMesh Pro\Sprites\EmojiOne Attribution.txt" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_Bitmap-Custom-Atlas.shader" />

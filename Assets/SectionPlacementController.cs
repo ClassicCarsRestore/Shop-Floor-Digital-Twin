@@ -57,6 +57,11 @@ public class SectionPlacementController : MonoBehaviour
     [SerializeField] private Button addButton;
     [SerializeField] private Button saveButton;
     [SerializeField] private Button cancelButton;
+    [SerializeField] private Button cancelAllButton;
+    [SerializeField] private Button saveToBDButton;
+    [SerializeField] private Button exitWarehouseButton;
+
+
     [SerializeField] private GameObject placementControls;
 
     [Header("Ghost Visual Feedback")]
@@ -180,11 +185,15 @@ public class SectionPlacementController : MonoBehaviour
     {
         if (isPlacing) return;
 
+        WarehouseHUD.Instance?.EnterEditMode();
+
         if (sectionPrefab == null)
         {
             Debug.LogError("[SectionPlacementController] sectionPrefab não atribuído.");
             return;
         }
+
+
 
         ghostInstance = Instantiate(sectionPrefab);
         ghostInstance.name = "SECTION_GHOST";
@@ -240,6 +249,8 @@ public class SectionPlacementController : MonoBehaviour
     {
         if (isPlacing) return;
         if (section == null) return;
+
+        WarehouseHUD.Instance?.EnterEditMode();
 
         ghostSection = section;
         ghostInstance = section.gameObject;
@@ -746,6 +757,8 @@ public class SectionPlacementController : MonoBehaviour
 
         if (addButton != null)
             addButton.interactable = true;
+
+        WarehouseHUD.Instance?.ExitEditMode();
 
         if (!keepObject && ghostInstance != null)
             Destroy(ghostInstance);
