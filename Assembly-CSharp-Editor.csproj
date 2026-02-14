@@ -60,7 +60,14 @@
     <Analyzer Include="C:\Program Files\Unity\Hub\Editor\2022.3.13f1\Editor\Data\Tools\Unity.SourceGenerators\Unity.Properties.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Editor\E2ChartOptionsLoaderEditor.cs" />
+    <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Editor\E2ChartDataImporterEditor.cs" />
+    <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Editor\E2ChartWindow.cs" />
+    <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Editor\E2ChartCombinerEditor.cs" />
+    <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Editor\E2ChartDataGeneratorEditor.cs" />
     <Compile Include="Assets\HbxLite\WebGL\Editor\WebGLRetinaToolsLite.cs" />
+    <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Editor\E2ChartEditor.cs" />
+    <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Editor\E2ChartDataEditor.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="UnityEngine">
