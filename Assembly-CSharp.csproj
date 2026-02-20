@@ -147,6 +147,7 @@
     <Compile Include="Assets\Objects\CarObject.cs" />
     <Compile Include="Assets\Warehouse\WarehouseLayoutDTOs.cs" />
     <Compile Include="Assets\Ice Pond\E2Chart\Examples\Scripts\E2ChartExampleScripting.cs" />
+    <Compile Include="Assets\EnergyTrendBarBinder.cs" />
     <Compile Include="Assets\Warehouse\StorageArea.cs" />
     <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Core\Builder\E2ChartDataInfoLinear.cs" />
     <Compile Include="Assets\UI\CarTimelineController.cs" />
@@ -168,6 +169,7 @@
     <Compile Include="Assets\Objects\CreatePolygon.cs" />
     <Compile Include="Assets\Objects\AccordionItem.cs" />
     <Compile Include="Assets\ColorPicker\Scripts\RectPicker.cs" />
+    <Compile Include="Assets\SimpleJSON.cs" />
     <Compile Include="Assets\WarehouseSectionSelection.cs" />
     <Compile Include="Assets\Objects\ColorPickerCar.cs" />
     <Compile Include="Assets\Objects\Roof.cs" />
@@ -216,7 +218,6 @@
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Surface-Mobile.shader" />
     <None Include="Assets\Ice Pond\E2Chart\Resources\Shaders\E2ChartUBlur.shader" />
     <None Include="Assets\Ice Pond\E2Chart\Resources\Shaders\E2ChartVGradient.shader" />
-    <None Include="Assets\Warehouse\README_LAYOUT_SETUP.txt" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Surface.shader" />
     <None Include="Assets\TextMesh Pro\Sprites\EmojiOne Attribution.txt" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_Bitmap-Custom-Atlas.shader" />
