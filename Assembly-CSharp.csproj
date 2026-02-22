@@ -203,6 +203,7 @@
     <Compile Include="Assets\ColorPicker\Scripts\PointerTrackerArea.cs" />
     <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Core\Handler\E2ChartPreviewHandler.cs" />
     <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Core\Graphic\E2ChartGraphicHeatmap.cs" />
+    <Compile Include="Assets\EnergyUsageLineChartBinder.cs" />
     <Compile Include="Assets\ColorPicker\Scripts\InputColorChannels.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -17,11 +17,11 @@ namespace API
         public const string MANAGER = "manager";
         public const string OWNER = "owner";
 
-       
-        //teste unity
-        private const string apiUrl = "https://charterturinmonitor.raimundobranco.com/api";
 
-        //private const string apiUrl = "/api";
+        //teste unity
+        //private const string apiUrl = "https://charterturinmonitor.raimundobranco.com/api";
+
+        private const string apiUrl = "/api";
         private string role;
         private string securityToken;
         public string lastCarLocation;
@@ -124,7 +124,7 @@ namespace API
         /// </summary>
         /// <returns>A task that completes once the car data has been received and processed.</returns>
         public async Task GetCarsAsync()
-    
+
         {
             Debug.Log("Fetching cars...");
             string url = $"{apiUrl}/Projects";
