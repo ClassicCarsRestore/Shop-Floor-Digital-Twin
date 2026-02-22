@@ -29,7 +29,7 @@ public class WarehouseLayoutController : MonoBehaviour
         var current = WarehouseLayoutSerializer.BuildFromRuntime(warehouseManager);
         try
         {
-            string currentJson = JsonConvert.SerializeObject(current);
+            string currentJson = JsonConvert.SerializeObject(current, Formatting.None);
             return currentJson != lastLoadedLayoutJson;
         }
         catch
@@ -79,7 +79,7 @@ public class WarehouseLayoutController : MonoBehaviour
         {
             Debug.LogWarning("[WarehouseLayoutController] GetLayout error: " + errorMsg);
             lastLoadedLayout = new WarehouseLayoutDTO { sections = new System.Collections.Generic.List<SectionLayoutDTO>() };
-            lastLoadedLayoutJson = JsonConvert.SerializeObject(lastLoadedLayout);
+            lastLoadedLayoutJson = JsonConvert.SerializeObject(lastLoadedLayout, Formatting.None);
             if (sectionPrefabForLayout != null)
                 WarehouseLayoutSerializer.ApplyLayout(lastLoadedLayout, warehouseManager, sectionPrefabForLayout);
         }
@@ -88,7 +88,7 @@ public class WarehouseLayoutController : MonoBehaviour
             lastLoadedLayout = loaded ?? new WarehouseLayoutDTO { sections = new System.Collections.Generic.List<SectionLayoutDTO>() };
             if (lastLoadedLayout.sections == null)
                 lastLoadedLayout.sections = new System.Collections.Generic.List<SectionLayoutDTO>();
-            lastLoadedLayoutJson = JsonConvert.SerializeObject(lastLoadedLayout);
+            lastLoadedLayoutJson = JsonConvert.SerializeObject(lastLoadedLayout, Formatting.None);
 
             if (sectionPrefabForLayout != null)
                 WarehouseLayoutSerializer.ApplyLayout(lastLoadedLayout, warehouseManager, sectionPrefabForLayout);
@@ -113,7 +113,7 @@ public class WarehouseLayoutController : MonoBehaviour
             {
                 Debug.Log("[WarehouseLayoutController] Layout guardado na BD.");
                 lastLoadedLayout = currentLayout;
-                lastLoadedLayoutJson = JsonConvert.SerializeObject(currentLayout);
+                lastLoadedLayoutJson = JsonConvert.SerializeObject(currentLayout, Formatting.None);
             },
             onError: err => Debug.LogWarning("[WarehouseLayoutController] SaveLayout error: " + err)
         ));

@@ -182,6 +182,7 @@
     <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Core\Graphic\E2ChartGraphicGridRadialLine.cs" />
     <Compile Include="Assets\SectionPlacementController.cs" />
     <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Core\E2ChartOptions.cs" />
+    <Compile Include="Assets\WarehouseOfflineSpawner.cs" />
     <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Core\Graphic\E2ChartGraphicRadarChartShade.cs" />
     <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Core\Handler\E2ChartCombinerPreviewHandler.cs" />
     <Compile Include="Assets\ColorPicker\Scripts\InputHex.cs" />

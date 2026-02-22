@@ -10,6 +10,9 @@ public class ShelfSectionShelvesController : MonoBehaviour
     [Header("Rules")]
     [SerializeField] private int minShelves = 2;
 
+    [Header("Defaults")]
+    [SerializeField] private int defaultAreasPerShelf = 6;
+
     private ShelfSection section;
 
     private void Awake()
@@ -31,38 +34,37 @@ public class ShelfSectionShelvesController : MonoBehaviour
             Debug.LogError("[ShelfSectionShelvesController] shelfUnitPrefab não atribuído.");
             return;
         }
+        if (section == null)
+        {
+            Debug.LogError("[ShelfSectionShelvesController] section é null.");
+            return;
+        }
+        if (string.IsNullOrEmpty(section.SectionId))
+        {
+            Debug.LogWarning("[ShelfSectionShelvesController] SectionId vazio. Atribui primeiro antes de criar shelves.");
+        }
 
-        // 1) topo atual (bounds de tudo dentro do ShelvesRoot)
         float topY = GetCurrentTopY(shelvesRoot);
 
-        // 2) instanciar unit como filha (vai herdar escala da section)
         GameObject unit = Instantiate(shelfUnitPrefab, shelvesRoot);
-        // renomeia a unit
         unit.name = $"ShelfUnit_{(section.Shelves.Count + 1)}";
-        // segurança para não trazer scale marada dentro da unit
         unit.transform.localScale = Vector3.one;
 
-        // 3) alinhar a base da unit com o topo atual
         Bounds unitBounds = CalculateWorldBounds(unit.transform);
         float deltaY = topY - unitBounds.min.y;
         unit.transform.position += new Vector3(0f, deltaY, 0f);
 
-      
-
-
-        // 4) reconstruir lista de shelves + IDs
+        // reconstruir lista de shelves + IDs
         RebuildShelvesFromHierarchy();
 
-        // 4.5) criar áreas default na shelf nova
+        // criar áreas default na shelf nova
         var newShelf = section.Shelves.Count > 0 ? section.Shelves[section.Shelves.Count - 1] : null;
         if (newShelf != null)
         {
-            // escolhe o default que queres (ex.: 6)
-            ShelfAreasBuilder.RebuildAreas(newShelf, 6);
+            int shelfIndex = section.Shelves.Count; // última shelf = count
+            ShelfAreasBuilder.RebuildAreas(newShelf, defaultAreasPerShelf, section.SectionId, shelfIndex);
         }
 
-
-        // 5) garantir highlight inclui novos renderers
         RefreshHighlight();
     }
 
@@ -74,7 +76,6 @@ public class ShelfSectionShelvesController : MonoBehaviour
             return;
         }
 
-        // Conta as shelves na hierarquia
         int shelfCount = CountShelvesInHierarchy();
         if (shelfCount <= minShelves)
         {
@@ -82,10 +83,9 @@ public class ShelfSectionShelvesController : MonoBehaviour
             return;
         }
 
-        //remover o último container
         if (shelvesRoot.childCount <= 0)
         {
-            Debug.LogWarning("[ShelfSectionShelvesController] Não há ShelfUnits para remover, mas shelfCount > minShelves. Confirma a hierarquia.");
+            Debug.LogWarning("[ShelfSectionShelvesController] Não há ShelfUnits para remover.");
             return;
         }
 
@@ -95,18 +95,12 @@ public class ShelfSectionShelvesController : MonoBehaviour
         StartCoroutine(RebuildEndOfFrame());
     }
 
-    
-
     private System.Collections.IEnumerator RebuildEndOfFrame()
     {
         yield return new WaitForEndOfFrame();
         RebuildShelvesFromHierarchy();
     }
 
-
-    // -------------------------
-    // REBUILD LIST
-    // -------------------------
     private void RebuildShelvesFromHierarchy()
     {
         if (section == null) return;
@@ -114,9 +108,8 @@ public class ShelfSectionShelvesController : MonoBehaviour
 
         section.Shelves.Clear();
 
-        // pega em todas as shelves dentro do ShelvesRoot (incluindo as novas)
         var shelves = shelvesRoot.GetComponentsInChildren<Shelf>(true)
-                                 .OrderBy(s => s.transform.position.y) // de baixo para cima
+                                 .OrderBy(s => s.transform.position.y)
                                  .ToList();
 
         for (int i = 0; i < shelves.Count; i++)
@@ -124,14 +117,17 @@ public class ShelfSectionShelvesController : MonoBehaviour
             var sh = shelves[i];
             if (sh == null) continue;
 
-            sh.ShelfId = (i + 1).ToString();
+            int shelfIndex = i + 1;
 
+            sh.ShelfId = $"{section.SectionId}-{shelfIndex}";
+
+            // IMPORTANTE: isto só "renomeia" ids existentes; não cria áreas.
             if (sh.Areas != null)
             {
                 for (int a = 0; a < sh.Areas.Count; a++)
                 {
                     if (sh.Areas[a] != null)
-                        sh.Areas[a].AreaId = (a + 1).ToString();
+                        sh.Areas[a].AreaId = $"{section.SectionId}-{shelfIndex}-{a + 1}";
                 }
             }
 
@@ -140,14 +136,9 @@ public class ShelfSectionShelvesController : MonoBehaviour
 
         Debug.Log($"[ShelfSectionShelvesController] Rebuild ok. Shelves={section.Shelves.Count}");
     }
-    public void RebuildShelves()
-    {
-        RebuildShelvesFromHierarchy();
-    }
 
-    // -------------------------
-    // HELPERS
-    // -------------------------
+    public void RebuildShelves() => RebuildShelvesFromHierarchy();
+
     private int CountShelvesInHierarchy()
     {
         if (shelvesRoot == null) return 0;

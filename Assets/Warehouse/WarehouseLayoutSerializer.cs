@@ -5,6 +5,7 @@ public static class WarehouseLayoutSerializer
 {
     /// <summary>
     /// Constrói o DTO do layout a partir do estado atual do WarehouseManager.
+    /// Agora ShelfLayoutDTO tem "areas: List<AreaLayoutDTO>" (não há areaCount).
     /// </summary>
     public static WarehouseLayoutDTO BuildFromRuntime(WarehouseManager manager)
     {
@@ -37,16 +38,37 @@ public static class WarehouseLayoutSerializer
 
             if (sec.Shelves != null)
             {
-                foreach (var shelf in sec.Shelves)
+                for (int i = 0; i < sec.Shelves.Count; i++)
                 {
+                    var shelf = sec.Shelves[i];
                     if (shelf == null) continue;
-                    int areaCount = shelf.Areas != null ? shelf.Areas.Count : 0;
 
-                    secDto.shelves.Add(new ShelfLayoutDTO
+                    var shelfDto = new ShelfLayoutDTO
                     {
-                        shelfId = shelf.ShelfId,
-                        areaCount = areaCount
-                    });
+                        shelfId = shelf.ShelfId, // "sec-index"
+                        areas = new List<AreaLayoutDTO>()
+                    };
+
+                    // Se não tens status/itemId no Unity (ainda), manda defaults.
+                    // Se tiveres esses campos no StorageArea, troca aqui para mapear.
+                    if (shelf.Areas != null)
+                    {
+                        for (int a = 0; a < shelf.Areas.Count; a++)
+                        {
+                            var ar = shelf.Areas[a];
+                            if (ar == null) continue;
+
+                            shelfDto.areas.Add(new AreaLayoutDTO
+                            {
+                                areaId = ar.AreaId,      // "sec-shelfIndex-areaIndex"
+                                index = a + 1,           // índice 1..N
+                                status = string.IsNullOrEmpty(ar.Status) ? "free" : ar.Status,
+                                itemId = string.IsNullOrEmpty(ar.ItemId) ? null : ar.ItemId
+                            });
+                        }
+                    }
+
+                    secDto.shelves.Add(shelfDto);
                 }
             }
 
@@ -58,11 +80,13 @@ public static class WarehouseLayoutSerializer
 
     /// <summary>
     /// Aplica o layout ao WarehouseManager: limpa sections atuais e recria a partir do DTO.
+    /// Cria as áreas em runtime com base em shelfDto.areas.Count.
     /// </summary>
     public static void ApplyLayout(WarehouseLayoutDTO layout, WarehouseManager manager, GameObject sectionPrefab)
     {
         if (manager == null) return;
 
+        // limpar runtime atual
         if (manager.Sections != null)
         {
             foreach (var old in manager.Sections)
@@ -74,6 +98,7 @@ public static class WarehouseLayoutSerializer
         }
 
         if (layout == null || layout.sections == null || layout.sections.Count == 0) return;
+
         if (sectionPrefab == null)
         {
             Debug.LogError("[WarehouseLayoutSerializer] sectionPrefab é null.");
@@ -100,10 +125,13 @@ public static class WarehouseLayoutSerializer
 
             sec.SectionId = secDto.sectionId ?? "";
             go.name = "Section_" + sec.SectionId;
+
             if (!manager.Sections.Contains(sec))
                 manager.Sections.Add(sec);
 
             var shelvesCtrl = go.GetComponent<ShelfSectionShelvesController>();
+
+            // 1) garantir shelves suficientes
             if (shelvesCtrl != null)
             {
                 shelvesCtrl.RebuildShelves();
@@ -116,8 +144,11 @@ public static class WarehouseLayoutSerializer
                     shelvesCtrl.AddShelf();
                     current = sec.Shelves != null ? sec.Shelves.Count : 0;
                 }
+
+                shelvesCtrl.RebuildShelves(); // reforço ids "sec-index"
             }
 
+            // 2) criar áreas por shelf a partir do DTO (A': precisa sectionId + shelfIndex)
             if (sec.Shelves != null && secDto.shelves != null)
             {
                 for (int i = 0; i < sec.Shelves.Count && i < secDto.shelves.Count; i++)
@@ -126,9 +157,38 @@ public static class WarehouseLayoutSerializer
                     var shelfDto = secDto.shelves[i];
                     if (shelf == null) continue;
 
-                    int areaCount = Mathf.Max(1, shelfDto.areaCount);
-                    ShelfAreasBuilder.RebuildAreas(shelf, areaCount);
+                    int shelfIndex = i + 1;
+                    int areaCount = (shelfDto.areas != null) ? shelfDto.areas.Count : 0;
+                    areaCount = Mathf.Max(1, areaCount);
+
+                    ShelfAreasBuilder.RebuildAreas(shelf, areaCount, sec.SectionId, shelfIndex);
+
+                    // (Opcional mas recomendado)
+                    // Se quiseres aplicar status/itemId às StorageArea criadas,
+                    // precisas que StorageArea tenha esses campos. Ex:
+                    // area.Status = ...
+                    // area.ItemId = ...
+                    // (Se ainda não tens isso no componente, ignora este bloco.)
+                    if (shelfDto.areas != null && shelf.Areas != null)
+                    {
+                        for (int a = 0; a < shelf.Areas.Count && a < shelfDto.areas.Count; a++)
+                        {
+                            var areaComp = shelf.Areas[a];
+                            var areaDto = shelfDto.areas[a];
+                            if (areaComp == null || areaDto == null) continue;
+
+                            // Garante AreaId exatamente igual ao DTO (mesmo que o builder já o faça)
+                            areaComp.AreaId = areaDto.areaId;
+
+                            // Se adicionares estes campos ao StorageArea no futuro:
+                            areaComp.Status = areaDto.status;
+                            areaComp.ItemId = areaDto.itemId;
+                            areaComp.UpdateVisual();
+                        }
+                    }
                 }
+
+                shelvesCtrl?.RebuildShelves(); // ids finais consistentes
             }
         }
 

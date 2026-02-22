@@ -693,27 +693,28 @@ public class SectionPlacementController : MonoBehaviour
             ShelfSection sec = null;
 
             if (WarehouseManager.Instance != null)
-            {
-                // AddSectionRuntime devolve a ShelfSection criada – usa o retorno!
                 sec = WarehouseManager.Instance.AddSectionRuntime(ghostInstance);
-            }
 
-            // Inicializa shelves + áreas default apenas se a section foi criada com sucesso
             if (sec != null)
             {
                 var shelvesCtrl = sec.GetComponent<ShelfSectionShelvesController>();
                 if (shelvesCtrl != null)
-                {
-                    // garante que a lista Section.Shelves está alinhada com a hierarquia
                     shelvesCtrl.RebuildShelves();
+
+                // default areas em todas as shelves (A')
+                if (sec.Shelves != null)
+                {
+                    for (int i = 0; i < sec.Shelves.Count; i++)
+                    {
+                        var shelf = sec.Shelves[i];
+                        if (shelf == null) continue;
+
+                        int shelfIndex = i + 1;
+                        ShelfAreasBuilder.RebuildAreas(shelf, 6, sec.SectionId, shelfIndex);
+                    }
                 }
 
-                // Cria áreas default (ex.: 6) em TODAS as shelves iniciais da section
-                foreach (var shelf in sec.Shelves)
-                {
-                    if (shelf == null) continue;
-                    ShelfAreasBuilder.RebuildAreas(shelf, 6);
-                }
+                shelvesCtrl?.RebuildShelves(); // reforço final ids
             }
 
             EndPlacement(keepObject: true);

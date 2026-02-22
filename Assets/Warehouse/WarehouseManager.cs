@@ -11,7 +11,7 @@ public class WarehouseManager : MonoBehaviour
     [Header("Prefabs")]
     public GameObject storageBoxPrefab;
 
-    // Guarda caixas instanciadas por localização (sec-shelf-area)
+    // Guarda caixas instanciadas por localizaï¿½ï¿½o (sec-shelf-area)
     private readonly Dictionary<string, StorageBox> boxesByLocation = new Dictionary<string, StorageBox>();
 
     public Transform WarehouseRoot;
@@ -31,7 +31,7 @@ public class WarehouseManager : MonoBehaviour
     // ---------------------------
 
     /// <summary>
-    /// Mostra TODAS as caixas do armazém (todas as locations) sem highlight.
+    /// Mostra TODAS as caixas do armazï¿½m (todas as locations) sem highlight.
     /// rows: lista com carId + location
     /// </summary>
     public void ShowAllStorage(List<StorageRowDTO> rows)
@@ -60,7 +60,7 @@ public class WarehouseManager : MonoBehaviour
 
         if (rows == null) return;
 
-        // 2) ligar highlight só nas locations do carro
+        // 2) ligar highlight sï¿½ nas locations do carro
         foreach (var row in rows)
         {
             if (row == null || row.location == null) continue;
@@ -77,7 +77,7 @@ public class WarehouseManager : MonoBehaviour
 
     /// <summary>
     /// Helper: faz highlight a partir de uma lista de locations (sem precisar de rows).
-    /// Útil se o endpoint do carro devolver só location.
+    /// ï¿½til se o endpoint do carro devolver sï¿½ location.
     /// </summary>
     public void HighlightCarBoxesByLocations(string carId, List<StorageLocationDTO> locations)
     {
@@ -95,7 +95,7 @@ public class WarehouseManager : MonoBehaviour
 
             if (boxesByLocation.TryGetValue(key, out var box) && box != null)
             {
-                
+
                 box.CarId = carId;
                 box.Highlight(true);
             }
@@ -103,7 +103,7 @@ public class WarehouseManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Mostra a(s) caixa(s) para um carro específico nas localizações indicadas.
+    /// Mostra a(s) caixa(s) para um carro especï¿½fico nas localizaï¿½ï¿½es indicadas.
     /// </summary>
     public void ShowStorageForCar(string carId, List<StorageLocationDTO> locations)
     {
@@ -124,30 +124,46 @@ public class WarehouseManager : MonoBehaviour
     {
         if (sectionGO == null) return null;
 
-        // garantir parent
         if (WarehouseRoot != null)
             sectionGO.transform.SetParent(WarehouseRoot, true);
 
-       
         var sec = sectionGO.GetComponent<ShelfSection>();
         if (sec == null)
         {
-            Debug.LogError("[WarehouseManager] sectionGO não tem ShelfSection no root.");
+            Debug.LogError("[WarehouseManager] sectionGO nï¿½o tem ShelfSection no root.");
             return null;
         }
 
+        // 1) ID da Section
         string newId = GetNextSectionIdString(Sections);
-
         sec.SectionId = newId;
         sectionGO.name = $"Section_{newId}";
 
         if (!Sections.Contains(sec))
             Sections.Add(sec);
 
+        // 2) Rebuild Shelves para aplicar ShelfId = "sec-index"
+        var shelvesCtrl = sectionGO.GetComponent<ShelfSectionShelvesController>();
+        if (shelvesCtrl != null)
+            shelvesCtrl.RebuildShelves(); // IMPORTANT: este mï¿½todo tem de gerar ids novos (ver nota abaixo)
+
+        // 3) Criar ï¿½reas default em todas as shelves iniciais
+        const int defaultAreas = 6;
+
+        if (sec.Shelves != null)
+        {
+            for (int i = 0; i < sec.Shelves.Count; i++)
+            {
+                var shelf = sec.Shelves[i];
+                ShelfAreasBuilder.RebuildAreas(shelf, defaultAreas, sec.SectionId, i + 1);
+            }
+        }
+
+        Physics.SyncTransforms();
         return sec;
     }
 
-    
+
     private string GetNextSectionIdString(List<ShelfSection> sections)
     {
         int max = 0;
@@ -179,16 +195,16 @@ public class WarehouseManager : MonoBehaviour
         var area = FindArea(loc.section, loc.shelf, loc.area);
         if (area == null)
         {
-            Debug.LogWarning($"[WarehouseManager] Não encontrei area: secção {loc.section}, prateleira {loc.shelf}, área {loc.area}");
+            Debug.LogWarning($"[WarehouseManager] Nï¿½o encontrei area: secï¿½ï¿½o {loc.section}, prateleira {loc.shelf}, ï¿½rea {loc.area}");
             return;
         }
 
         Transform anchor = area.BoxAnchor != null ? area.BoxAnchor : area.transform;
 
-        // Key única por localização
+        // Key ï¿½nica por localizaï¿½ï¿½o
         string key = MakeKey(loc.section, loc.shelf, loc.area);
 
-        // Se já existe uma caixa nessa location, destrói e substitui (evita duplicados)
+        // Se jï¿½ existe uma caixa nessa location, destrï¿½i e substitui (evita duplicados)
         if (boxesByLocation.TryGetValue(key, out var existing) && existing != null)
         {
             Destroy(existing.gameObject);
@@ -209,13 +225,16 @@ public class WarehouseManager : MonoBehaviour
             boxComp.LocationKey = key;
             boxComp.Highlight(highlight);
 
+            // garantir tamanho/posiÃ§Ã£o corretos no slot
+            boxComp.FitToAreaSlot();
+
             boxesByLocation[key] = boxComp;
         }
     }
 
     private string MakeKey(string section, string shelf, string area)
     {
-        return $"{section}-{shelf}-{area}";
+        return area; // "1-2-1"
     }
 
     /// <summary>
@@ -223,38 +242,22 @@ public class WarehouseManager : MonoBehaviour
     /// </summary>
     private StorageArea FindArea(string sectionId, string shelfId, string areaId)
     {
-        ShelfSection section = null;
         foreach (var sec in Sections)
         {
-            if (sec != null && sec.SectionId == sectionId)
-            {
-                section = sec;
-                break;
-            }
-        }
-        if (section == null) return null;
+            if (sec == null) continue;
 
-        Shelf shelf = null;
-        foreach (var sh in section.Shelves)
-        {
-            if (sh != null && sh.ShelfId == shelfId)
+            foreach (var sh in sec.Shelves)
             {
-                shelf = sh;
-                break;
-            }
-        }
-        if (shelf == null) return null;
+                if (sh == null) continue;
 
-        StorageArea area = null;
-        foreach (var ar in shelf.Areas)
-        {
-            if (ar != null && ar.AreaId == areaId)
-            {
-                area = ar;
-                break;
+                foreach (var ar in sh.Areas)
+                {
+                    if (ar != null && ar.AreaId == areaId)
+                        return ar;
+                }
             }
         }
-        return area;
+        return null;
     }
 
     /// <summary>
@@ -281,7 +284,7 @@ public class WarehouseManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Remove todas as caixas do armazém.
+    /// Remove todas as caixas do armazï¿½m.
     /// </summary>
     public void ClearAllBoxes()
     {
@@ -302,7 +305,7 @@ public class WarehouseManager : MonoBehaviour
         }
     }
 
- 
 
-  
+
+
 }

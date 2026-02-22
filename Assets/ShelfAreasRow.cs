@@ -28,4 +28,14 @@ public class ShelfAreasRow : MonoBehaviour
     {
         if (countText != null) countText.text = v.ToString();
     }
+
+    public void SetMinusInteractable(bool on)
+    {
+        if (minusButton != null) minusButton.interactable = on;
+    }
+
+    public void SetPlusInteractable(bool on)
+    {
+        if (plusButton != null) plusButton.interactable = on;
+    }
 }

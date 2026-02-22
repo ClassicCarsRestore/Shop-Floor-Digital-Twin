@@ -21,5 +21,14 @@ public class SectionLayoutDTO
 public class ShelfLayoutDTO
 {
     public string shelfId;
-    public int areaCount;
+    public List<AreaLayoutDTO> areas;
+}
+
+[Serializable]
+public class AreaLayoutDTO
+{
+    public string areaId;
+    public int index;
+    public string status;
+    public string itemId;
 }

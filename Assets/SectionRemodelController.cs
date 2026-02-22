@@ -48,7 +48,7 @@ public class SectionRemodelController : MonoBehaviour
     [SerializeField] private int minAreas = 1;
     [SerializeField] private int maxAreas = 24;
 
-  
+
 
     // estado editável (por shelf index)
     private readonly List<int> areaCountPerShelf = new List<int>();
@@ -65,7 +65,7 @@ public class SectionRemodelController : MonoBehaviour
     private static readonly int BaseColorProp = Shader.PropertyToID("_BaseColor");
 
     public event Action<ShelfSection> OnRemodelStarted;
-    public event Action<ShelfSection, bool> OnRemodelFinished; 
+    public event Action<ShelfSection, bool> OnRemodelFinished;
 
     public bool IsRemodeling { get; private set; }
 
@@ -127,7 +127,7 @@ public class SectionRemodelController : MonoBehaviour
 
         OnRemodelStarted?.Invoke(current);
 
-       
+
         ApplyRangesToSliders();
         SyncUIFromSection();
         ValidateAndApplyFeedback();
@@ -141,7 +141,7 @@ public class SectionRemodelController : MonoBehaviour
 
         Vector3 s = current.transform.localScale;
 
-       
+
         float sx = Mathf.Clamp(s.x, widthRange.x, widthRange.y);
         float sy = Mathf.Clamp(s.y, heightRange.x, heightRange.y);
         float sz = Mathf.Clamp(s.z, lengthRange.x, lengthRange.y);
@@ -150,7 +150,7 @@ public class SectionRemodelController : MonoBehaviour
         if (heightSlider != null) heightSlider.SetValueWithoutNotify(sy);
         if (lengthSlider != null) lengthSlider.SetValueWithoutNotify(sz);
 
-        
+
         if (widthInput != null) widthInput.SetTextWithoutNotify(s.x.ToString("0.##"));
         if (heightInput != null) heightInput.SetTextWithoutNotify(s.y.ToString("0.##"));
         if (lengthInput != null) lengthInput.SetTextWithoutNotify(s.z.ToString("0.##"));
@@ -190,7 +190,7 @@ public class SectionRemodelController : MonoBehaviour
 
 
 
-    
+
 
     private void BuildAreasRowsFromSection(ShelfSection section)
     {
@@ -232,19 +232,45 @@ public class SectionRemodelController : MonoBehaviour
             row.SetCount(areaCountPerShelf[idx]);
 
             row.OnMinus = () =>
-            {
-                areaCountPerShelf[idx] = Mathf.Max(minAreas, areaCountPerShelf[idx] - 1);
-                row.SetCount(areaCountPerShelf[idx]);
-            };
+ {
+     TryDecreaseAreaCount(idx, row);
+ };
 
             row.OnPlus = () =>
             {
-                areaCountPerShelf[idx] = Mathf.Min(maxAreas, areaCountPerShelf[idx] + 1);
-                row.SetCount(areaCountPerShelf[idx]);
+                // aumenta SEM restrições (não remove nada, por isso é seguro)
+                int before = areaCountPerShelf[idx];
+                int after = Mathf.Min(maxAreas, before + 1);
+
+                areaCountPerShelf[idx] = after;
+                row.SetCount(after);
+
+                // ao aumentar, o "-" pode voltar a ficar ativo
+                RefreshRowInteractivity(idx, row);
             };
+
+            // define interatividade inicial dos botões
+            RefreshRowInteractivity(idx, row);
         }
     }
 
+
+    private bool ValidateAllShelvesBeforeSave()
+    {
+        for (int i = 0; i < current.Shelves.Count; i++)
+        {
+            var shelf = current.Shelves[i];
+            if (shelf == null) continue;
+
+            int desired = (i < areaCountPerShelf.Count) ? areaCountPerShelf[i] : minAreas;
+            if (!CanReduceAreas(shelf, desired, out string blockingAreaId))
+            {
+                Debug.LogWarning($"[Remodel] Save blocked. Shelf {i + 1} would remove occupied area: {blockingAreaId}");
+                return false;
+            }
+        }
+        return true;
+    }
 
 
     private void ClearRows()
@@ -262,6 +288,12 @@ public class SectionRemodelController : MonoBehaviour
         if (!IsRemodeling || current == null) return;
         if (!canSave) return;
 
+        if (!ValidateAllShelvesBeforeSave())
+        {
+            Debug.LogWarning("[Remodel] Cannot save. Validation failed for one or more shelves.");
+            return;
+        }
+
         var sec = current;
 
         Physics.SyncTransforms();
@@ -273,13 +305,119 @@ public class SectionRemodelController : MonoBehaviour
             if (shelf == null) continue;
 
             int desired = (i < areaCountPerShelf.Count) ? areaCountPerShelf[i] : 1;
-            ShelfAreasBuilder.RebuildAreas(shelf, desired);
+
+            int shelfIndex = i + 1;
+            ShelfAreasBuilder.RebuildAreas(shelf, desired, current.SectionId, shelfIndex);
         }
 
 
         ClearRemodelVisual();
         End();
         OnRemodelFinished?.Invoke(sec, true);
+    }
+
+    // Considera "ocupada" se Status == "occupied" OU se ItemId não está vazio.
+    // (Isto cobre inconsistências: Status pode falhar, mas ItemId é a verdade.)
+    private static bool IsAreaOccupied(StorageArea area)
+    {
+        if (area == null) return false;
+
+        bool hasItem = !string.IsNullOrWhiteSpace(area.ItemId);
+        bool statusOccupied = string.Equals(area.Status, "occupied", StringComparison.OrdinalIgnoreCase);
+
+        return hasItem || statusOccupied;
+    }
+
+    /// <summary>
+    /// Regra: só permite reduzir para desiredCount se TODAS as áreas no "tail"
+    /// (indices desiredCount..currentCount-1) estiverem livres.
+    /// </summary>
+    private bool CanReduceAreas(Shelf shelf, int desiredCount, out string blockingAreaId)
+    {
+        blockingAreaId = null;
+
+        if (shelf == null || shelf.Areas == null) return true;
+
+        int currentCount = shelf.Areas.Count;
+        desiredCount = Mathf.Max(minAreas, desiredCount);
+
+        // não é redução
+        if (desiredCount >= currentCount) return true;
+
+        // vamos remover: desiredCount+1 .. currentCount (1-based)
+        // em 0-based: desiredCount .. currentCount-1
+        for (int i = currentCount - 1; i >= desiredCount; i--)
+        {
+            var area = shelf.Areas[i];
+            if (IsAreaOccupied(area))
+            {
+                blockingAreaId = area != null ? area.AreaId : $"index={i}";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Tenta diminuir 1 área na shelf idx, respeitando a regra.
+    /// Atualiza UI (contador + estado do botão).
+    /// </summary>
+    private void TryDecreaseAreaCount(int shelfIdx, ShelfAreasRow row)
+    {
+        if (current == null || current.Shelves == null) return;
+        if (shelfIdx < 0 || shelfIdx >= current.Shelves.Count) return;
+
+        var shelf = current.Shelves[shelfIdx];
+        if (shelf == null) return;
+
+        int currentDesired = areaCountPerShelf[shelfIdx];
+        int nextDesired = Mathf.Max(minAreas, currentDesired - 1);
+
+        // se já está no mínimo
+        if (nextDesired == currentDesired)
+        {
+            row?.SetMinusInteractable(false);
+            return;
+        }
+
+        if (!CanReduceAreas(shelf, nextDesired, out string blockingAreaId))
+        {
+            Debug.LogWarning($"[Remodel] Cannot reduce Shelf {shelfIdx + 1} to {nextDesired}. Blocking occupied area: {blockingAreaId}");
+
+            // Mantém valor, e bloqueia o botão "-" para deixar claro
+            row?.SetMinusInteractable(false);
+            return;
+        }
+
+        // OK: reduz
+        areaCountPerShelf[shelfIdx] = nextDesired;
+        row?.SetCount(nextDesired);
+
+        // Depois de reduzir, ainda pode reduzir mais?
+        row?.SetMinusInteractable(CanReduceAreas(shelf, nextDesired - 1, out _));
+    }
+
+    /// <summary>
+    /// Atualiza o estado do botão "-" (e opcionalmente "+") sempre que desenhas linhas.
+    /// </summary>
+    private void RefreshRowInteractivity(int shelfIdx, ShelfAreasRow row)
+    {
+        if (current == null || current.Shelves == null) return;
+        if (row == null) return;
+
+        var shelf = current.Shelves[shelfIdx];
+        if (shelf == null) return;
+
+        int desired = areaCountPerShelf[shelfIdx];
+
+        // Pode reduzir mais 1?
+        bool canMinus = desired > minAreas && CanReduceAreas(shelf, desired - 1, out _);
+        row.SetMinusInteractable(canMinus);
+
+        // Pode aumentar? (regra simples)
+        bool canPlus = desired < maxAreas;
+        row.SetPlusInteractable(canPlus);
     }
 
     private void Cancel()
