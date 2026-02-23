@@ -6,9 +6,35 @@ using System.Collections;
 using System.Collections.Generic;
 using UI;
 using UnityEngine;
+using UnityEngine.UI;
+using E2C;
 
 public class HeatmapModeController : MonoBehaviour
 {
+    [Serializable]
+    public class HeatmapZonePoint
+    {
+        public string locationId;
+        public string zoneName;
+        public float value;
+        public float percent;
+    }
+
+    [Serializable]
+    public class HeatmapChartPayload
+    {
+        public DateTime from;
+        public DateTime to;
+        public HeatmapMetric metric;
+        public HeatmapScale scale;
+        public HeatmapCurve curve;
+        public float total;
+        public float max;
+        public List<HeatmapZonePoint> points = new();
+    }
+
+    public event Action<HeatmapChartPayload> OnHeatmapChartUpdated;
+
     [SerializeField] private bool debugLogHeatmap = true;
 
     [Header("Visual Settings")]
@@ -19,6 +45,9 @@ public class HeatmapModeController : MonoBehaviour
     [Header("Refs")]
     [SerializeField] private GameObject locationPrefab;
     [SerializeField] private HeatmapHUDController heatmapHudPrefab;
+
+    [Header("Chart UI (Optional)")]
+    [SerializeField] private GameObject heatmapChartUiPrefab;
 
     private APIscript api;
     private readonly Dictionary<string, GameObject> zoneGo = new();
@@ -40,6 +69,7 @@ public class HeatmapModeController : MonoBehaviour
     private readonly Dictionary<string, string> activityToLocationCache = new();
 
     private GameObject hudInstance;
+    private GameObject chartUiInstance;
     private HeatmapHUDController hud;
     private DateTime? currentFrom, currentTo;
     private HeatmapMetric currentMetric = HeatmapMetric.Frequency;
@@ -63,12 +93,14 @@ public class HeatmapModeController : MonoBehaviour
     private readonly Dictionary<string, List<string>> activityToLocations = new();
     private bool mappingsPrepared = false;
 
+    private HeatmapChartPayload lastChartPayload;
+
     private static readonly int PROP_COLOR = Shader.PropertyToID("_Color");
     private static readonly int PROP_BASE_COLOR = Shader.PropertyToID("_BaseColor");
 
     private void Update()
     {
-       
+
         if (isInHeatmapMode && Input.GetKeyUp(KeyCode.Alpha1))
         {
             if (currentFrom.HasValue && currentTo.HasValue)
@@ -100,15 +132,16 @@ public class HeatmapModeController : MonoBehaviour
         if (isInHeatmapMode) return;
         isInHeatmapMode = true;
 
-        
+
         firstFloorVisible = true;
 
-        if (uiManager != null) {
+        if (uiManager != null)
+        {
             uiManager.InteractableOff();
             uiManager.VirtualGridOff();
         }
         ChangeCameraToTop();
-        
+
 
         StartCoroutine(SetupAndEnter());
     }
@@ -188,10 +221,10 @@ public class HeatmapModeController : MonoBehaviour
                 if (!TryParseHex(loc.color, out dbColor))
                     dbColor = ReadRendererColor(rend);
 
-                
+
                 originalColors[loc.id] = dbColor;
 
-                
+
                 var c0 = baseColor;
                 c0.a = 0f;
                 SetRendererColor(rend, c0);
@@ -215,6 +248,22 @@ public class HeatmapModeController : MonoBehaviour
         {
             Debug.LogError("[Heatmap] Prefab do HUD não contém HeatmapHUDController.");
             yield break;
+        }
+
+        if (heatmapChartUiPrefab != null)
+        {
+            CleanupStaleHeatmapChartUi(canvas.transform);
+
+            var chartRoot = Instantiate(heatmapChartUiPrefab);
+            chartUiInstance = AttachChartUiToHud(chartRoot, hudInstance.transform, canvas.transform);
+
+            if (chartUiInstance != null)
+            {
+                CleanupChartPreviews(chartUiInstance);
+                CleanupBakedChartChildren(chartUiInstance);
+                chartUiInstance.transform.SetAsLastSibling();
+                NormalizeChartUiLayout(chartUiInstance);
+            }
         }
 
         hud.OnDateRangeChanged += HandleDateRangeChanged;
@@ -292,6 +341,7 @@ public class HeatmapModeController : MonoBehaviour
         {
             Debug.LogWarning("[Heatmap] Sem ActivityAndLocationHistory.");
             HideAllZones();
+            EmitHeatmapChartPayload(new Dictionary<string, double>(), 0.0, 0.0, from, to, metric);
             yield break;
         }
 
@@ -307,6 +357,7 @@ public class HeatmapModeController : MonoBehaviour
         {
             Debug.LogWarning("[Heatmap] Lista de tasks veio vazia.");
             HideAllZones();
+            EmitHeatmapChartPayload(new Dictionary<string, double>(), 0.0, 0.0, from, to, metric);
             yield break;
         }
 
@@ -431,6 +482,8 @@ public class HeatmapModeController : MonoBehaviour
             lastTotalVal = 0;
             lastMetric = metric;
 
+            EmitHeatmapChartPayload(valuesByZone, totalVal, maxVal, from, to, metric);
+
             yield break;
         }
 
@@ -438,6 +491,8 @@ public class HeatmapModeController : MonoBehaviour
         lastValuesByZone = valuesByZone;
         lastTotalVal = totalVal;
         lastMetric = metric;
+
+        EmitHeatmapChartPayload(valuesByZone, totalVal, maxVal, from, to, metric);
 
         var mpb = new MaterialPropertyBlock();
 
@@ -552,6 +607,61 @@ public class HeatmapModeController : MonoBehaviour
         mappingsPrepared = true;
     }
 
+    public bool TryGetLastChartPayload(out HeatmapChartPayload payload)
+    {
+        payload = lastChartPayload;
+        return payload != null;
+    }
+
+    private void EmitHeatmapChartPayload(
+        Dictionary<string, double> valuesByZone,
+        double totalVal,
+        double maxVal,
+        DateTime from,
+        DateTime to,
+        HeatmapMetric metric)
+    {
+        var payload = new HeatmapChartPayload
+        {
+            from = from,
+            to = to,
+            metric = metric,
+            scale = currentScale,
+            curve = currentCurve,
+            total = (float)Math.Max(0.0, totalVal),
+            max = (float)Math.Max(0.0, maxVal),
+            points = new List<HeatmapZonePoint>()
+        };
+
+        if (api != null && api.locations != null)
+        {
+            foreach (var loc in api.locations)
+            {
+                if (loc == null || string.IsNullOrEmpty(loc.id))
+                    continue;
+
+                valuesByZone.TryGetValue(loc.id, out var valueRaw);
+
+                string zoneName = !string.IsNullOrEmpty(loc.name) ? loc.name : loc.id;
+                float value = (float)Math.Max(0.0, valueRaw);
+                float percent = (totalVal > 0.0)
+                    ? Mathf.Clamp01((float)(valueRaw / totalVal))
+                    : 0f;
+
+                payload.points.Add(new HeatmapZonePoint
+                {
+                    locationId = loc.id,
+                    zoneName = zoneName,
+                    value = value,
+                    percent = percent
+                });
+            }
+        }
+
+        lastChartPayload = payload;
+        OnHeatmapChartUpdated?.Invoke(payload);
+    }
+
     private void ApplyUniformAlpha(float alpha)
     {
         var mpb = new MaterialPropertyBlock();
@@ -588,9 +698,9 @@ public class HeatmapModeController : MonoBehaviour
             }
         }
 
-       
- 
-        
+
+
+
 
         zoneGo.Clear();
         zoneRenderer.Clear();
@@ -601,6 +711,19 @@ public class HeatmapModeController : MonoBehaviour
         lastTotalVal = 0;
         currentTooltipLocId = null;
         mappingsPrepared = false;
+        lastChartPayload = null;
+
+        OnHeatmapChartUpdated?.Invoke(new HeatmapChartPayload
+        {
+            from = currentFrom ?? DateTime.Today,
+            to = currentTo ?? DateTime.Today,
+            metric = currentMetric,
+            scale = currentScale,
+            curve = currentCurve,
+            total = 0f,
+            max = 0f,
+            points = new List<HeatmapZonePoint>()
+        });
 
         // limpar tooltip
         if (tooltipInstance != null)
@@ -619,6 +742,12 @@ public class HeatmapModeController : MonoBehaviour
             hud.OnExitRequested -= ExitHeatmapMode;
             hud.OnScaleChanged -= HandleScaleChanged;
             hud.OnCurveChanged -= HandleCurveChanged;
+
+            if (chartUiInstance != null)
+            {
+                Destroy(chartUiInstance);
+                chartUiInstance = null;
+            }
 
             Destroy(hudInstance);
             hud = null;
@@ -715,6 +844,193 @@ public class HeatmapModeController : MonoBehaviour
             var c = baseColor; c.a = Mathf.Clamp01(alpha);
             SetRendererColor(rend, c);
         }
+    }
+
+    private GameObject AttachChartUiToHud(GameObject chartRoot, Transform hudParent, Transform canvasParent)
+    {
+        if (chartRoot == null || hudParent == null)
+            return null;
+
+        var targetParent = canvasParent != null ? canvasParent : hudParent;
+
+        var panel = FindDeepChild(chartRoot.transform, "HeatmapChartPanel");
+        if (panel != null)
+        {
+            panel.SetParent(targetParent, false);
+            panel.localScale = Vector3.one;
+
+            Destroy(chartRoot);
+            return panel.gameObject;
+        }
+
+        var rootRect = chartRoot.GetComponent<RectTransform>();
+        if (rootRect != null)
+        {
+            rootRect.SetParent(targetParent, false);
+            return chartRoot;
+        }
+
+        var innerCanvas = chartRoot.GetComponentInChildren<Canvas>(true);
+        if (innerCanvas != null)
+        {
+            var canvasGo = innerCanvas.gameObject;
+            var canvasRect = canvasGo.GetComponent<RectTransform>();
+            if (canvasRect != null)
+            {
+                canvasRect.SetParent(targetParent, false);
+                Destroy(chartRoot);
+                return canvasGo;
+            }
+        }
+
+        chartRoot.transform.SetParent(targetParent, false);
+        return chartRoot;
+    }
+
+    private void NormalizeChartUiLayout(GameObject chartRoot)
+    {
+        if (chartRoot == null)
+            return;
+
+        chartRoot.transform.localScale = Vector3.one;
+
+        var rootRect = chartRoot.GetComponent<RectTransform>();
+        if (rootRect != null)
+        {
+            rootRect.localScale = Vector3.one;
+            rootRect.anchorMin = new Vector2(0f, 1f);
+            rootRect.anchorMax = new Vector2(0f, 1f);
+            rootRect.pivot = new Vector2(0f, 1f);
+            rootRect.sizeDelta = new Vector2(Mathf.Clamp(rootRect.sizeDelta.x <= 1f ? 700f : rootRect.sizeDelta.x, 600f, 900f), Mathf.Clamp(rootRect.sizeDelta.y <= 1f ? 380f : rootRect.sizeDelta.y, 240f, 720f));
+
+            var hudRect = hudInstance != null ? hudInstance.GetComponent<RectTransform>() : null;
+            if (hudRect != null)
+            {
+                rootRect.anchoredPosition = new Vector2(hudRect.anchoredPosition.x, hudRect.anchoredPosition.y - hudRect.sizeDelta.y - 8f);
+            }
+            else
+            {
+                rootRect.anchoredPosition = new Vector2(16f, -312f);
+            }
+        }
+
+        var allRects = chartRoot.GetComponentsInChildren<RectTransform>(true);
+        for (int i = 0; i < allRects.Length; i++)
+        {
+            if (allRects[i] != null)
+                allRects[i].localScale = Vector3.one;
+        }
+
+        if (rootRect != null)
+            rootRect.sizeDelta = new Vector2(Mathf.Clamp(rootRect.sizeDelta.x, 600f, 900f), Mathf.Clamp(rootRect.sizeDelta.y, 240f, 720f));
+    }
+
+    private void CleanupStaleHeatmapChartUi(Transform canvasRoot)
+    {
+        if (canvasRoot == null)
+            return;
+
+        var toDestroy = new List<GameObject>();
+        var transforms = canvasRoot.GetComponentsInChildren<Transform>(true);
+
+        for (int i = 0; i < transforms.Length; i++)
+        {
+            var tr = transforms[i];
+            if (tr == null) continue;
+
+            var go = tr.gameObject;
+            var n = go.name;
+
+            if (n == "HeatmapChartPanel" || n == "HeatmapChart" || n.StartsWith("HeatmapChart(") || n.Contains("HeatmapChart(Preview)"))
+            {
+                toDestroy.Add(go);
+            }
+        }
+
+        for (int i = 0; i < toDestroy.Count; i++)
+        {
+            if (toDestroy[i] != null)
+                Destroy(toDestroy[i]);
+        }
+
+        chartUiInstance = null;
+    }
+
+    private void CleanupChartPreviews(GameObject chartRoot)
+    {
+        if (chartRoot == null)
+            return;
+
+        var previewHandlers = chartRoot.GetComponentsInChildren<E2ChartPreviewHandler>(true);
+        for (int i = 0; i < previewHandlers.Length; i++)
+        {
+            var preview = previewHandlers[i];
+            if (preview != null)
+                Destroy(preview.gameObject);
+        }
+
+        var charts = chartRoot.GetComponentsInChildren<E2Chart>(true);
+        for (int i = 0; i < charts.Length; i++)
+        {
+            var chart = charts[i];
+            if (chart == null) continue;
+            chart.ClearPreview();
+        }
+
+        var transforms = chartRoot.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < transforms.Length; i++)
+        {
+            var tr = transforms[i];
+            if (tr == null) continue;
+            if (tr.gameObject.name.Contains("(Preview)"))
+                Destroy(tr.gameObject);
+        }
+    }
+
+    private void CleanupBakedChartChildren(GameObject chartRoot)
+    {
+        if (chartRoot == null)
+            return;
+
+        var chartTransform = FindDeepChild(chartRoot.transform, "HeatmapChart");
+        if (chartTransform == null)
+            return;
+
+        var toDelete = new List<GameObject>();
+        for (int i = 0; i < chartTransform.childCount; i++)
+        {
+            var child = chartTransform.GetChild(i);
+            if (child == null) continue;
+
+            var n = child.name;
+            if (n == "Content" || n == "Title" || n == "Legends" || n == "Tooltip" || n.Contains("(Preview)"))
+                toDelete.Add(child.gameObject);
+        }
+
+        for (int i = 0; i < toDelete.Count; i++)
+        {
+            if (toDelete[i] != null)
+                Destroy(toDelete[i]);
+        }
+    }
+
+    private Transform FindDeepChild(Transform root, string childName)
+    {
+        if (root == null || string.IsNullOrEmpty(childName))
+            return null;
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            var child = root.GetChild(i);
+            if (child.name == childName)
+                return child;
+
+            var nested = FindDeepChild(child, childName);
+            if (nested != null)
+                return nested;
+        }
+
+        return null;
     }
 
     private void ChangeCameraToTop()

@@ -15030,7 +15030,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 719808408}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.00000023322286, y: 0.7132506, z: -0.7009092, w: -0.0000002373294}
+  m_LocalRotation: {x: -0.00000023322228, y: 0.7132506, z: -0.7009092, w: -0.0000002373288}
   m_LocalPosition: {x: 582, y: 1099, z: -442}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -19062,9 +19062,9 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.01
-  far clip plane: 100000
-  field of view: 50.00001
+  near clip plane: 0.3
+  far clip plane: 1200
+  field of view: 49.99999
   orthographic: 0
   orthographic size: 5
   m_Depth: -1
@@ -19090,8 +19090,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 963194225}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0.9773348, z: -0.2116997, w: 1e-45}
-  m_LocalPosition: {x: 582, y: 499, z: 648}
+  m_LocalRotation: {x: -0.00000023322228, y: 0.7132506, z: -0.7009092, w: -0.0000002373288}
+  m_LocalPosition: {x: 582, y: 1099, z: -442}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -29283,6 +29283,7 @@ MonoBehaviour:
   alphaMax: 0.9
   locationPrefab: {fileID: 4285708714443112865, guid: 7828ba9b3edc15a4aad36cfdb7c7bb47, type: 3}
   heatmapHudPrefab: {fileID: 7147523799354240278, guid: 7a3fd6d863c0bea43851a49250a3bdb1, type: 3}
+  heatmapChartUiPrefab: {fileID: 6001543558681053234, guid: f233f341ab8cd0042951436270ab4fe5, type: 3}
   tooltipPrefab: {fileID: -3419022814119240726, guid: db5e5f0ca2b189546953c4f823470c61, type: 3}
   currentScale: 0
   currentCurve: 0
