@@ -34,6 +34,11 @@ public class SectionRemodelController : MonoBehaviour
 
     [SerializeField] private LayerMask collisionMask;       // layer das estantes existentes
     [SerializeField] private float overlapPadding = 0.05f;
+    [SerializeField] private LayerMask wallsMask;           // paredes (colliders)
+
+    [Header("Remodel Bounds From Walls")]
+    [SerializeField] private bool useWallsAsHardBounds = true;
+    [SerializeField] private float boundsEpsilon = 0.001f;
 
     [Header("Remodel Visual Feedback")]
     [SerializeField] private Color validTint = new Color(0f, 1f, 0f, 0.35f);
@@ -55,6 +60,11 @@ public class SectionRemodelController : MonoBehaviour
     private readonly List<ShelfAreasRow> spawnedRows = new List<ShelfAreasRow>();
 
     private bool canSave = true;
+    private bool lastBoundsValid = true;
+    private bool lastCollisionsValid = true;
+    private bool wallBoundsReady = false;
+    private Vector2 wallBoundsX;
+    private Vector2 wallBoundsZ;
 
     private Renderer[] sectionRenderers;
     private BoxCollider sectionCollider;
@@ -117,9 +127,10 @@ public class SectionRemodelController : MonoBehaviour
         originalScale = current.transform.localScale;
 
         BuildAreasRowsFromSection(section);
+        RebuildWallBoundsFromColliders();
 
 
-        sectionCollider = current.GetComponentInChildren<BoxCollider>();
+        sectionCollider = ResolveSectionCollider(current);
         sectionRenderers = current.GetComponentsInChildren<Renderer>(true);
 
         IsRemodeling = true;
@@ -458,7 +469,12 @@ public class SectionRemodelController : MonoBehaviour
         if (current == null) return;
 
         Physics.SyncTransforms();
-        canSave = ValidateBounds() && ValidateCollisions();
+        lastBoundsValid = ValidateBounds();
+        lastCollisionsValid = ValidateCollisions();
+        canSave = lastBoundsValid && lastCollisionsValid;
+
+        if (!canSave)
+            Debug.Log($"[SectionRemodelController][VALIDATION] invalid bounds={lastBoundsValid} collisions={lastCollisionsValid} section={current.SectionId}");
 
         if (saveRemodelButton != null)
             saveRemodelButton.interactable = canSave;
@@ -471,6 +487,30 @@ public class SectionRemodelController : MonoBehaviour
         if (sectionCollider == null) return true;
 
         Bounds b = sectionCollider.bounds;
+
+        if (placementController != null && placementController.TryGetPlacementBounds(out var placementX, out var placementZ))
+        {
+            bool insideX = b.min.x >= placementX.x - boundsEpsilon && b.max.x <= placementX.y + boundsEpsilon;
+            bool insideZ = b.min.z >= placementZ.x - boundsEpsilon && b.max.z <= placementZ.y + boundsEpsilon;
+            return insideX && insideZ;
+        }
+
+        if (useWallsAsHardBounds && wallBoundsReady)
+        {
+            bool insideX = b.min.x >= wallBoundsX.x - boundsEpsilon && b.max.x <= wallBoundsX.y + boundsEpsilon;
+            bool insideZ = b.min.z >= wallBoundsZ.x - boundsEpsilon && b.max.z <= wallBoundsZ.y + boundsEpsilon;
+            return insideX && insideZ;
+        }
+
+        // Se era para usar paredes mas não conseguimos calcular wall bounds,
+        // não bloquear o remodel por configuração incompleta.
+        if (useWallsAsHardBounds && !wallBoundsReady)
+            return true;
+
+        // Se bounds manuais não estão configurados no Inspector, não invalidar.
+        bool manualBoundsConfigured = warehouseBoundsX.y > warehouseBoundsX.x && warehouseBoundsZ.y > warehouseBoundsZ.x;
+        if (!manualBoundsConfigured)
+            return true;
 
         // limites X
         if (b.min.x < warehouseBoundsX.x) return false;
@@ -487,11 +527,13 @@ public class SectionRemodelController : MonoBehaviour
     {
         if (sectionCollider == null) return true;
 
-        Vector3 center = sectionCollider.bounds.center;
-        Vector3 halfExtents = sectionCollider.bounds.extents + Vector3.one * overlapPadding;
-        Quaternion rot = current.transform.rotation;
+        Vector3 center = sectionCollider.transform.TransformPoint(sectionCollider.center);
+        Vector3 halfExtents = Vector3.Scale(AbsVec3(sectionCollider.size) * 0.5f, AbsVec3(sectionCollider.transform.lossyScale));
+        halfExtents += Vector3.one * overlapPadding;
+        Quaternion rot = sectionCollider.transform.rotation;
 
-        Collider[] hits = Physics.OverlapBox(center, halfExtents, rot, collisionMask, QueryTriggerInteraction.Ignore);
+        LayerMask mask = collisionMask | (useWallsAsHardBounds ? wallsMask : 0);
+        Collider[] hits = Physics.OverlapBox(center, halfExtents, rot, mask, QueryTriggerInteraction.Ignore);
 
         foreach (var h in hits)
         {
@@ -514,6 +556,7 @@ public class SectionRemodelController : MonoBehaviour
         {
             var r = sectionRenderers[i];
             if (r == null) continue;
+            if (IsStorageAreaRenderer(r)) continue;
 
             r.GetPropertyBlock(mpb);
             mpb.SetColor(BaseColorProp, tint); // URP
@@ -530,8 +573,117 @@ public class SectionRemodelController : MonoBehaviour
         {
             var r = sectionRenderers[i];
             if (r == null) continue;
+            if (IsStorageAreaRenderer(r)) continue;
 
             r.SetPropertyBlock(null);
         }
+
+        RestoreAreasVisuals(current);
+    }
+
+    private static bool IsStorageAreaRenderer(Renderer renderer)
+    {
+        return renderer != null && renderer.GetComponentInParent<StorageArea>() != null;
+    }
+
+    private static void RestoreAreasVisuals(ShelfSection section)
+    {
+        if (section == null || section.Shelves == null) return;
+
+        for (int i = 0; i < section.Shelves.Count; i++)
+        {
+            var shelf = section.Shelves[i];
+            if (shelf == null || shelf.Areas == null) continue;
+
+            for (int a = 0; a < shelf.Areas.Count; a++)
+            {
+                var area = shelf.Areas[a];
+                if (area == null) continue;
+                area.UpdateVisual();
+            }
+        }
+    }
+
+    private static Vector3 AbsVec3(Vector3 v)
+    {
+        return new Vector3(Mathf.Abs(v.x), Mathf.Abs(v.y), Mathf.Abs(v.z));
+    }
+
+    private static BoxCollider ResolveSectionCollider(ShelfSection section)
+    {
+        if (section == null) return null;
+
+        // manter alinhado com o placement (GetComponentInChildren)
+        var fromPlacementStyle = section.GetComponentInChildren<BoxCollider>();
+        if (fromPlacementStyle != null) return fromPlacementStyle;
+
+        var rootCol = section.GetComponent<BoxCollider>();
+        if (rootCol != null) return rootCol;
+
+        var all = section.GetComponentsInChildren<BoxCollider>(true);
+        BoxCollider best = null;
+        float bestVolume = -1f;
+
+        for (int i = 0; i < all.Length; i++)
+        {
+            var c = all[i];
+            if (c == null || !c.enabled) continue;
+            if (c.GetComponentInParent<StorageArea>() != null) continue;
+
+            Vector3 size = Vector3.Scale(AbsVec3(c.size), AbsVec3(c.transform.lossyScale));
+            float volume = Mathf.Abs(size.x * size.y * size.z);
+            if (volume > bestVolume)
+            {
+                bestVolume = volume;
+                best = c;
+            }
+        }
+
+        return best;
+    }
+
+    private void RebuildWallBoundsFromColliders()
+    {
+        wallBoundsReady = false;
+
+        if (!useWallsAsHardBounds) return;
+        if (wallsMask.value == 0)
+        {
+            Debug.LogWarning("[SectionRemodelController] wallsMask vazio. Remodel vai ignorar validação por wall bounds.");
+            return;
+        }
+
+        Collider[] all = FindObjectsOfType<Collider>(true);
+        Bounds b = default;
+        bool hasAny = false;
+
+        for (int i = 0; i < all.Length; i++)
+        {
+            Collider c = all[i];
+            if (c == null) continue;
+
+            int layerBit = 1 << c.gameObject.layer;
+            if ((wallsMask.value & layerBit) == 0) continue;
+
+            if (!hasAny)
+            {
+                b = c.bounds;
+                hasAny = true;
+            }
+            else
+            {
+                b.Encapsulate(c.bounds);
+            }
+        }
+
+        if (!hasAny)
+        {
+            Debug.LogWarning("[SectionRemodelController] Não encontrei colliders nas layers do wallsMask.");
+            return;
+        }
+
+        wallBoundsX = new Vector2(b.min.x, b.max.x);
+        wallBoundsZ = new Vector2(b.min.z, b.max.z);
+        wallBoundsReady = true;
     }
 }

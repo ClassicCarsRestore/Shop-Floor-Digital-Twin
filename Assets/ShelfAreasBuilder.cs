@@ -224,21 +224,12 @@ public static class ShelfAreasBuilder
         }
     }
 
-    // bounds locais: encapsula todos os renderers/colliders em espaço local da shelf
+    // bounds locais: encapsula geometria em espaço local da shelf
+    // prioridade para Renderers (mais estável quando há colliders com escala negativa)
     private static bool TryGetLocalBounds(Transform root, out Bounds localBounds)
     {
         localBounds = default;
         bool has = false;
-
-        var cols = root.GetComponentsInChildren<Collider>(true);
-        for (int i = 0; i < cols.Length; i++)
-        {
-            var c = cols[i];
-            if (c == null) continue;
-            EncapsulateWorldBoundsIntoLocal(root, c.bounds, ref localBounds, ref has);
-        }
-
-        if (has) return true;
 
         var rends = root.GetComponentsInChildren<Renderer>(true);
         for (int i = 0; i < rends.Length; i++)
@@ -248,7 +239,28 @@ public static class ShelfAreasBuilder
             EncapsulateWorldBoundsIntoLocal(root, r.bounds, ref localBounds, ref has);
         }
 
+        if (has) return true;
+
+        // fallback para colliders (ignorando os casos problemáticos)
+        var cols = root.GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < cols.Length; i++)
+        {
+            var c = cols[i];
+            if (c == null) continue;
+            if (!c.enabled) continue;
+            if (HasNegativeLossyScale(c.transform)) continue;
+
+            EncapsulateWorldBoundsIntoLocal(root, c.bounds, ref localBounds, ref has);
+        }
+
         return has;
+    }
+
+    private static bool HasNegativeLossyScale(Transform t)
+    {
+        if (t == null) return false;
+        var s = t.lossyScale;
+        return s.x < 0f || s.y < 0f || s.z < 0f;
     }
 
     private static void EncapsulateWorldBoundsIntoLocal(

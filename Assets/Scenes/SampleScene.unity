@@ -5475,6 +5475,54 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 246412124}
   m_CullTransparentMesh: 1
+--- !u!1 &247622341
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 247622343}
+  - component: {fileID: 247622342}
+  m_Layer: 0
+  m_Name: EnergyTelemetryLogger
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &247622342
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 247622341}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a4ff1fd5fdf1e74ab1749e658773483, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  energyPanelController: {fileID: 412254998}
+  autoFindController: 1
+  outputFileName: energy_unity_log.csv
+  appendIfExists: 1
+--- !u!4 &247622343
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 247622341}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 313, y: 449.3, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &260064794
 GameObject:
   m_ObjectHideFlags: 8
@@ -11856,6 +11904,11 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 1024
   overlapPadding: 0.05
+  wallsMask:
+    serializedVersion: 2
+    m_Bits: 0
+  useWallsAsHardBounds: 1
+  boundsEpsilon: 0.001
   validTint: {r: 0, g: 1, b: 0, a: 0.35}
   invalidTint: {r: 1, g: 0, b: 0, a: 0.35}
   areasListContent: {fileID: 786464836}
@@ -15030,7 +15083,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 719808408}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.00000023322228, y: 0.7132506, z: -0.7009092, w: -0.0000002373288}
+  m_LocalRotation: {x: -0.00000023322279, y: 0.7132506, z: -0.7009092, w: -0.00000023732933}
   m_LocalPosition: {x: 582, y: 1099, z: -442}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -19090,7 +19143,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 963194225}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.00000023322228, y: 0.7132506, z: -0.7009092, w: -0.0000002373288}
+  m_LocalRotation: {x: -0.00000023322279, y: 0.7132506, z: -0.7009092, w: -0.00000023732933}
   m_LocalPosition: {x: 582, y: 1099, z: -442}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -19336,6 +19389,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   layoutRepository: {fileID: 1567621304}
+  storageRepository: {fileID: 1712006658}
   warehouseManager: {fileID: 1090010524}
   sectionPrefabForLayout: {fileID: 4810652636569123194, guid: af42ef8f815d81c47a6d41d8712c9008, type: 3}
 --- !u!4 &977483310
@@ -35905,9 +35959,9 @@ MonoBehaviour:
   addButton: {fileID: 281722019}
   saveButton: {fileID: 2046599246}
   cancelButton: {fileID: 1136739044}
-  cancelAllButton: {fileID: 0}
-  saveToBDButton: {fileID: 0}
-  exitWarehouseButton: {fileID: 0}
+  cancelAllButton: {fileID: 1182590626}
+  saveToBDButton: {fileID: 939891649}
+  exitWarehouseButton: {fileID: 86280751}
   placementControls: {fileID: 1077831758}
   validTint: {r: 0, g: 1, b: 0, a: 0.35}
   invalidTint: {r: 1, g: 0, b: 0, a: 0.35}
@@ -45941,3 +45995,4 @@ SceneRoots:
   - {fileID: 1567621305}
   - {fileID: 977483310}
   - {fileID: 883968235}
+  - {fileID: 247622343}

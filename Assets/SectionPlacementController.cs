@@ -117,7 +117,7 @@ public class SectionPlacementController : MonoBehaviour
         halfExtents = AbsVec3(halfExtents); // “cinto e suspensórios”
         halfExtents += Vector3.one * overlapPadding;
 
-        
+
 
         Collider[] hits = Physics.OverlapBox(center, halfExtents, rot, mask, QueryTriggerInteraction.Ignore);
 
@@ -658,6 +658,7 @@ public class SectionPlacementController : MonoBehaviour
         {
             var r = ghostRenderers[i];
             if (r == null) continue;
+            if (IsStorageAreaRenderer(r)) continue;
 
             r.GetPropertyBlock(mpb);
             mpb.SetColor(BaseColorProp, tint);
@@ -673,7 +674,33 @@ public class SectionPlacementController : MonoBehaviour
         {
             var r = ghostRenderers[i];
             if (r == null) continue;
+            if (IsStorageAreaRenderer(r)) continue;
             r.SetPropertyBlock(null);
+        }
+
+        RestoreAreasVisuals(ghostSection);
+    }
+
+    private static bool IsStorageAreaRenderer(Renderer renderer)
+    {
+        return renderer != null && renderer.GetComponentInParent<StorageArea>() != null;
+    }
+
+    private static void RestoreAreasVisuals(ShelfSection section)
+    {
+        if (section == null || section.Shelves == null) return;
+
+        for (int i = 0; i < section.Shelves.Count; i++)
+        {
+            var shelf = section.Shelves[i];
+            if (shelf == null || shelf.Areas == null) continue;
+
+            for (int a = 0; a < shelf.Areas.Count; a++)
+            {
+                var area = shelf.Areas[a];
+                if (area == null) continue;
+                area.UpdateVisual();
+            }
         }
     }
 
@@ -725,7 +752,7 @@ public class SectionPlacementController : MonoBehaviour
         var finishedSection = ghostSection;
         EndPlacement(keepObject: true);
         OnEditPlacementFinished?.Invoke(finishedSection, true);
-        
+
     }
 
     private void CancelPlacement()
@@ -738,9 +765,9 @@ public class SectionPlacementController : MonoBehaviour
             ghostInstance.transform.rotation = editOriginalRot;
             ClearGhostVisual();
             var finishedSection = ghostSection;
-           
+
             EndPlacement(keepObject: true);
-            OnEditPlacementFinished?.Invoke(finishedSection, false);     
+            OnEditPlacementFinished?.Invoke(finishedSection, false);
             return;
         }
 
@@ -783,7 +810,7 @@ public class SectionPlacementController : MonoBehaviour
 
         if (cameraSystem != null)
             cameraSystem.ExitTopPlacementViewRestore();
-        
+
     }
 
     public void SetWarehouseBounds(Vector2 boundsX, Vector2 boundsZ, float y)
@@ -791,6 +818,35 @@ public class SectionPlacementController : MonoBehaviour
         warehouseBoundsX = boundsX;
         warehouseBoundsZ = boundsZ;
         fixedY = y;
+    }
+
+    public bool TryGetPlacementBounds(out Vector2 boundsX, out Vector2 boundsZ)
+    {
+        boundsX = default;
+        boundsZ = default;
+
+        if (useWallsAsHardBounds)
+        {
+            if (!wallBoundsReady)
+                RebuildWallBoundsFromColliders();
+
+            if (wallBoundsReady)
+            {
+                boundsX = wallBoundsX;
+                boundsZ = wallBoundsZ;
+                return true;
+            }
+        }
+
+        bool manualOk = warehouseBoundsX.y > warehouseBoundsX.x && warehouseBoundsZ.y > warehouseBoundsZ.x;
+        if (manualOk)
+        {
+            boundsX = warehouseBoundsX;
+            boundsZ = warehouseBoundsZ;
+            return true;
+        }
+
+        return false;
     }
 
     public void SetAddButtonInteractable(bool on)

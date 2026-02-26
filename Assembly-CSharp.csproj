@@ -86,6 +86,7 @@
     <Compile Include="Assets\ShelfSectionShelvesController.cs" />
     <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Core\Graphic\E2ChartGraphicRadarChartPoint.cs" />
     <Compile Include="Assets\Objects\CarSlotObject.cs" />
+    <Compile Include="Assets\EnergyTelemetryLogger.cs" />
     <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Core\Builder\E2ChartGridAxisHorizontal.cs" />
     <Compile Include="Assets\Objects\CarSlotMeshCreator.cs" />
     <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Core\Builder\E2ChartGridCircle.cs" />

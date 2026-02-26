@@ -141,11 +141,19 @@ public class HeatmapHUDController : MonoBehaviour
         var picker = pickerGO.GetComponent<SimpleDatePicker>();
         if (picker == null)
         {
-            Debug.LogError("[HUD] SimpleDatePicker não encontrado no prefab de date picker.");
+            Debug.LogError("[HUD] SimpleDatePicker nï¿½o encontrado no prefab de date picker.");
             Destroy(pickerGO);
             isOpeningPicker = false;
             return;
         }
+
+        DateTime seedDate = DateTime.Today;
+        if (isFrom)
+            seedDate = fromDate ?? toDate ?? DateTime.Today;
+        else
+            seedDate = toDate ?? fromDate ?? DateTime.Today;
+
+        picker.Initialize(seedDate);
 
         picker.OnDateSelected += date =>
         {
@@ -158,6 +166,16 @@ public class HeatmapHUDController : MonoBehaviour
             {
                 toDate = date;
                 if (toLabel) toLabel.text = date.ToString("yyyy-MM-dd");
+            }
+
+            if (fromDate.HasValue && toDate.HasValue && fromDate.Value.Date > toDate.Value.Date)
+            {
+                DateTime temp = fromDate.Value;
+                fromDate = toDate;
+                toDate = temp;
+
+                if (fromLabel) fromLabel.text = fromDate.Value.ToString("yyyy-MM-dd");
+                if (toLabel) toLabel.text = toDate.Value.ToString("yyyy-MM-dd");
             }
 
             EmitDates();

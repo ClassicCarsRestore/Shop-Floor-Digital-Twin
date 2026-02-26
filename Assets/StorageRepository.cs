@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Networking;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 public class StorageRepository : MonoBehaviour
 {
@@ -38,9 +39,11 @@ public class StorageRepository : MonoBehaviour
 
     private IEnumerator GetItems(string url, Action<List<StorageRowDTO>> onSuccess, Action<string> onError)
     {
+        Debug.Log("[StorageRepository][GetItems][START] " + url);
+
         using var req = UnityWebRequest.Get(url);
         req.SetRequestHeader("Accept", "application/json");
-        
+
 
         yield return req.SendWebRequest();
 
@@ -54,11 +57,13 @@ public class StorageRepository : MonoBehaviour
         }
 
         string json = req.downloadHandler.text;
+        Debug.Log($"[StorageRepository][GetItems][END] result={req.result} http={(int)req.responseCode}");
+        Debug.Log("[StorageRepository][GetItems][RESPONSE_JSON_RAW] " + json);
 
-        List<WarehouseItemDTO> items;
+        List<StorageRowDTO> rows;
         try
         {
-            items = JsonConvert.DeserializeObject<List<WarehouseItemDTO>>(json);
+            rows = ParseRowsFromItemsJson(json);
         }
         catch (Exception e)
         {
@@ -67,26 +72,6 @@ public class StorageRepository : MonoBehaviour
             Debug.LogError("JSON recebido: " + json);
             onError?.Invoke(msg);
             yield break;
-        }
-
-        var rows = new List<StorageRowDTO>();
-        if (items != null)
-        {
-            foreach (var it in items)
-            {
-                if (it == null || it.warehouse_location == null) continue;
-
-                rows.Add(new StorageRowDTO
-                {
-                    carId = it.project_id.ToString(),
-                    location = new StorageLocationDTO
-                    {
-                        section = it.warehouse_location.section,
-                        shelf = it.warehouse_location.shelf,
-                        area = it.warehouse_location.area
-                    }
-                });
-            }
         }
 
         Debug.Log($"[StorageRepository] Parsed rows = {rows.Count}");
@@ -99,9 +84,11 @@ public class StorageRepository : MonoBehaviour
         Action<List<StorageRowDTO>> onSuccess,
         Action<string> onError)
     {
+        Debug.Log("[StorageRepository][GetProjectLocations][START] " + url + " projectId=" + projectId);
+
         using var req = UnityWebRequest.Get(url);
         req.SetRequestHeader("Accept", "application/json");
-        
+
 
         yield return req.SendWebRequest();
 
@@ -115,11 +102,13 @@ public class StorageRepository : MonoBehaviour
         }
 
         string json = req.downloadHandler.text;
+        Debug.Log($"[StorageRepository][GetProjectLocations][END] result={req.result} http={(int)req.responseCode}");
+        Debug.Log("[StorageRepository][GetProjectLocations][RESPONSE_JSON_RAW] " + json);
 
-        List<ProjectLocationDTO> locs;
+        List<StorageRowDTO> rows;
         try
         {
-            locs = JsonConvert.DeserializeObject<List<ProjectLocationDTO>>(json);
+            rows = ParseRowsFromProjectLocationsJson(json, projectId);
         }
         catch (Exception e)
         {
@@ -130,29 +119,146 @@ public class StorageRepository : MonoBehaviour
             yield break;
         }
 
-        var rows = new List<StorageRowDTO>();
-        if (locs != null)
-        {
-            foreach (var l in locs)
-            {
-                if (l == null || l.warehouse_location == null) continue;
-
-                rows.Add(new StorageRowDTO
-                {
-                    // highlight usa carId para bater com o que foi pedido
-                    carId = projectId,
-                    location = new StorageLocationDTO
-                    {
-                        section = l.warehouse_location.section,
-                        shelf = l.warehouse_location.shelf,
-                        area = l.warehouse_location.area
-                    }
-                });
-            }
-        }
-
         Debug.Log($"[StorageRepository] Parsed car locations rows = {rows.Count} (project_id={projectId})");
         onSuccess?.Invoke(rows);
+    }
+
+    private List<StorageRowDTO> ParseRowsFromItemsJson(string json)
+    {
+        var rows = new List<StorageRowDTO>();
+        int skipped = 0;
+
+        foreach (var item in EnumeratePayloadArray(json, "items", "data", "results", "payload", "value"))
+        {
+            var loc = ExtractLocation(item);
+            if (loc == null)
+            {
+                skipped++;
+                continue;
+            }
+
+            string section = ReadString(loc, "section", "sectionId", "section_id");
+            string shelf = ReadString(loc, "shelf", "shelfId", "shelf_id");
+            string area = ReadString(loc, "area", "areaId", "area_id");
+
+            if (string.IsNullOrWhiteSpace(section) || string.IsNullOrWhiteSpace(shelf) || string.IsNullOrWhiteSpace(area))
+            {
+                skipped++;
+                continue;
+            }
+
+            string carId = ReadString(item, "project_id", "projectId", "carId", "car_id");
+            if (string.IsNullOrWhiteSpace(carId)) carId = "unknown";
+
+            rows.Add(new StorageRowDTO
+            {
+                carId = carId,
+                location = new StorageLocationDTO
+                {
+                    section = section,
+                    shelf = shelf,
+                    area = area
+                }
+            });
+        }
+
+        Debug.Log($"[StorageRepository][GetItems][MAP] mapped={rows.Count} skipped={skipped}");
+        return rows;
+    }
+
+    private List<StorageRowDTO> ParseRowsFromProjectLocationsJson(string json, string projectId)
+    {
+        var rows = new List<StorageRowDTO>();
+        int skipped = 0;
+
+        foreach (var item in EnumeratePayloadArray(json, "locations", "items", "data", "results", "payload", "value"))
+        {
+            var loc = ExtractLocation(item) ?? item;
+
+            string section = ReadString(loc, "section", "sectionId", "section_id");
+            string shelf = ReadString(loc, "shelf", "shelfId", "shelf_id");
+            string area = ReadString(loc, "area", "areaId", "area_id");
+
+            if (string.IsNullOrWhiteSpace(section) || string.IsNullOrWhiteSpace(shelf) || string.IsNullOrWhiteSpace(area))
+            {
+                skipped++;
+                continue;
+            }
+
+            rows.Add(new StorageRowDTO
+            {
+                carId = projectId,
+                location = new StorageLocationDTO
+                {
+                    section = section,
+                    shelf = shelf,
+                    area = area
+                }
+            });
+        }
+
+        Debug.Log($"[StorageRepository][GetProjectLocations][MAP] mapped={rows.Count} skipped={skipped}");
+        return rows;
+    }
+
+    private IEnumerable<JToken> EnumeratePayloadArray(string json, params string[] envelopeKeys)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            yield break;
+
+        JToken root;
+        try
+        {
+            root = JToken.Parse(json);
+        }
+        catch
+        {
+            yield break;
+        }
+
+        if (root is JArray arr)
+        {
+            foreach (var t in arr) yield return t;
+            yield break;
+        }
+
+        if (root is JObject obj)
+        {
+            foreach (var key in envelopeKeys)
+            {
+                var token = obj[key];
+                if (token is JArray envArr)
+                {
+                    foreach (var t in envArr) yield return t;
+                    yield break;
+                }
+            }
+
+            // fallback: objeto único
+            yield return obj;
+        }
+    }
+
+    private JToken ExtractLocation(JToken item)
+    {
+        if (item == null) return null;
+        return item["warehouse_location"]
+               ?? item["warehouseLocation"]
+               ?? item["location"]
+               ?? item["warehouseLocationDto"];
+    }
+
+    private string ReadString(JToken token, params string[] keys)
+    {
+        if (token == null || keys == null) return null;
+        foreach (var key in keys)
+        {
+            var v = token[key];
+            if (v == null || v.Type == JTokenType.Null) continue;
+            string s = v.Type == JTokenType.String ? v.Value<string>() : v.ToString();
+            if (!string.IsNullOrWhiteSpace(s)) return s;
+        }
+        return null;
     }
 
     // -----------------------------

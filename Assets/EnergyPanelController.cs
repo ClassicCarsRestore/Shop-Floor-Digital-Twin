@@ -71,6 +71,8 @@ public class EnergyPanelController : MonoBehaviour
 
     private Coroutine refreshCo;
 
+    public event Action<OverviewResponse> OverviewUpdated;
+
     private sealed class FrontendCacheEntry
     {
         public object Data;
@@ -457,6 +459,7 @@ public class EnergyPanelController : MonoBehaviour
             {
                 if (data == null) { ApplyErrorState(); return; }
                 ApplyToUI(data);
+                OverviewUpdated?.Invoke(data);
             },
             err =>
             {
