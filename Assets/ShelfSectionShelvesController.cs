@@ -180,11 +180,52 @@ public class ShelfSectionShelvesController : MonoBehaviour
         if (renderers == null || renderers.Length == 0)
             return new Bounds(root.position, Vector3.zero);
 
-        Bounds bounds = renderers[0].bounds;
-        for (int i = 1; i < renderers.Length; i++)
-            bounds.Encapsulate(renderers[i].bounds);
+        bool has = false;
+        Bounds bounds = default;
+
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            var r = renderers[i];
+            if (r == null) continue;
+            if (ShouldIgnoreForStackingBounds(r.transform, root)) continue;
+
+            if (!has)
+            {
+                bounds = r.bounds;
+                has = true;
+            }
+            else
+            {
+                bounds.Encapsulate(r.bounds);
+            }
+        }
+
+        if (!has)
+            return new Bounds(root.position, Vector3.zero);
 
         return bounds;
+    }
+
+    private static bool ShouldIgnoreForStackingBounds(Transform candidate, Transform root)
+    {
+        if (candidate == null || root == null) return false;
+
+        if (candidate.GetComponent<SkinnedMeshRenderer>() != null)
+            return true;
+
+        for (Transform t = candidate; t != null; t = t.parent)
+        {
+            if (t.GetComponent<StorageBox>() != null)
+                return true;
+
+            if (t.GetComponent<StorageArea>() != null)
+                return true;
+
+            if (t == root)
+                break;
+        }
+
+        return false;
     }
 
     private static bool IsShelfOccupied(Shelf shelf)

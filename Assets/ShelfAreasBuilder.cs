@@ -236,6 +236,7 @@ public static class ShelfAreasBuilder
         {
             var r = rends[i];
             if (r == null) continue;
+            if (ShouldIgnoreForShelfBounds(r.transform, root)) continue;
             EncapsulateWorldBoundsIntoLocal(root, r.bounds, ref localBounds, ref has);
         }
 
@@ -249,6 +250,7 @@ public static class ShelfAreasBuilder
             if (c == null) continue;
             if (!c.enabled) continue;
             if (HasNegativeLossyScale(c.transform)) continue;
+            if (ShouldIgnoreForShelfBounds(c.transform, root)) continue;
 
             EncapsulateWorldBoundsIntoLocal(root, c.bounds, ref localBounds, ref has);
         }
@@ -261,6 +263,28 @@ public static class ShelfAreasBuilder
         if (t == null) return false;
         var s = t.lossyScale;
         return s.x < 0f || s.y < 0f || s.z < 0f;
+    }
+
+    private static bool ShouldIgnoreForShelfBounds(Transform candidate, Transform root)
+    {
+        if (candidate == null || root == null) return false;
+
+        if (candidate.GetComponent<SkinnedMeshRenderer>() != null)
+            return true;
+
+        for (Transform t = candidate; t != null; t = t.parent)
+        {
+            if (t.GetComponent<StorageBox>() != null)
+                return true;
+
+            if (t.GetComponent<StorageArea>() != null)
+                return true;
+
+            if (t == root)
+                break;
+        }
+
+        return false;
     }
 
     private static void EncapsulateWorldBoundsIntoLocal(

@@ -344,8 +344,8 @@ MonoBehaviour:
   CarId: 
   LocationKey: 
   boxRenderer: {fileID: 8087776444297559385}
-  autoFitToParentArea: 1
   padding: 0.85
+  autoFit: 1
 --- !u!1 &5143147688173065770
 GameObject:
   m_ObjectHideFlags: 0
