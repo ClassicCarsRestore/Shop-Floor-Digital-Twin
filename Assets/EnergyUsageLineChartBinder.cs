@@ -3,7 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using UnityEngine;
+using UnityEngine.UI;
 using E2C;
+using TMPro;
 
 public class EnergyUsageLineChartBinder : MonoBehaviour
 {
@@ -11,7 +13,8 @@ public class EnergyUsageLineChartBinder : MonoBehaviour
     {
         Today,
         ThisWeek,
-        ThisMonth
+        ThisMonth,
+        CustomRange
     }
 
     [Header("Controller")]
@@ -23,6 +26,13 @@ public class EnergyUsageLineChartBinder : MonoBehaviour
 
     [Header("Filter")]
     [SerializeField] private FilterMode defaultFilter = FilterMode.Today;
+
+    [Header("Date Range (From/To)")]
+    [SerializeField] private GameObject datePickerPrefab;
+    [SerializeField] private Button buttonFrom;
+    [SerializeField] private Button buttonTo;
+    [SerializeField] private TMP_Text fromLabel;
+    [SerializeField] private TMP_Text toLabel;
 
     [Header("Refresh")]
     [SerializeField] private float refreshSeconds = 60f;
@@ -43,11 +53,40 @@ public class EnergyUsageLineChartBinder : MonoBehaviour
 
     private Coroutine co;
     private FilterMode activeFilter;
+    private DateTime? customFromDate;
+    private DateTime? customToDate;
+    private Canvas parentCanvas;
+    private bool isOpeningPicker;
+
+    private void Awake()
+    {
+        parentCanvas = GetComponentInParent<Canvas>();
+
+        if (buttonFrom != null)
+        {
+            buttonFrom.onClick.RemoveListener(OnFromClicked);
+            buttonFrom.onClick.AddListener(OnFromClicked);
+        }
+
+        if (buttonTo != null)
+        {
+            buttonTo.onClick.RemoveListener(OnToClicked);
+            buttonTo.onClick.AddListener(OnToClicked);
+        }
+    }
 
     private void OnEnable()
     {
         if (controller == null) controller = GetComponentInParent<EnergyPanelController>();
         activeFilter = defaultFilter;
+
+        if (!customFromDate.HasValue || !customToDate.HasValue)
+        {
+            customToDate = DateTime.Today;
+            customFromDate = DateTime.Today.AddDays(-6);
+        }
+
+        RefreshDateLabels();
         RefreshOnce();
 
         if (autoRefresh)
@@ -114,6 +153,10 @@ public class EnergyUsageLineChartBinder : MonoBehaviour
                     err => Debug.LogWarning("[EnergyUsageLineChartBinder] " + err)
                 );
                 break;
+
+            case FilterMode.CustomRange:
+                RefreshCustomRange();
+                break;
         }
     }
 
@@ -133,6 +176,109 @@ public class EnergyUsageLineChartBinder : MonoBehaviour
     {
         activeFilter = FilterMode.ThisMonth;
         RefreshOnce();
+    }
+
+    public void OnFromClicked()
+    {
+        OpenDatePicker(true);
+    }
+
+    public void OnToClicked()
+    {
+        OpenDatePicker(false);
+    }
+
+    private void OpenDatePicker(bool isFrom)
+    {
+        if (isOpeningPicker || datePickerPrefab == null || parentCanvas == null)
+            return;
+
+        isOpeningPicker = true;
+
+        GameObject pickerGO = Instantiate(datePickerPrefab, parentCanvas.transform);
+        var picker = pickerGO.GetComponent<SimpleDatePicker>();
+        if (picker == null)
+        {
+            Debug.LogError("[EnergyUsageLineChartBinder] SimpleDatePicker não encontrado no prefab.");
+            Destroy(pickerGO);
+            isOpeningPicker = false;
+            return;
+        }
+
+        DateTime seedDate = isFrom
+            ? (customFromDate ?? customToDate ?? DateTime.Today)
+            : (customToDate ?? customFromDate ?? DateTime.Today);
+
+        picker.Initialize(seedDate);
+
+        picker.OnDateSelected += date =>
+        {
+            if (isFrom) customFromDate = date.Date;
+            else customToDate = date.Date;
+
+            NormalizeDateRange();
+            RefreshDateLabels();
+
+            activeFilter = FilterMode.CustomRange;
+            RefreshOnce();
+
+            Destroy(pickerGO);
+            isOpeningPicker = false;
+        };
+
+        picker.OnCancel += () =>
+        {
+            Destroy(pickerGO);
+            isOpeningPicker = false;
+        };
+    }
+
+    private void RefreshCustomRange()
+    {
+        if (!customFromDate.HasValue || !customToDate.HasValue)
+        {
+            Debug.LogWarning("[EnergyUsageLineChartBinder] Range inválido: from/to não definido.");
+            return;
+        }
+
+        NormalizeDateRange();
+
+        controller.RequestPowerTimeseriesBetween(
+            customFromDate.Value,
+            customToDate.Value,
+            payload =>
+            {
+                if (payload != null)
+                {
+                    payload.title = "Energy Usage Chart";
+                    payload.subtitle = $"{customFromDate.Value:yyyy-MM-dd} → {customToDate.Value:yyyy-MM-dd}";
+                }
+                ApplyToLineChart(payload);
+            },
+            err => Debug.LogWarning("[EnergyUsageLineChartBinder] " + err)
+        );
+    }
+
+    private void NormalizeDateRange()
+    {
+        if (!customFromDate.HasValue || !customToDate.HasValue)
+            return;
+
+        if (customFromDate.Value.Date > customToDate.Value.Date)
+        {
+            DateTime tmp = customFromDate.Value;
+            customFromDate = customToDate.Value;
+            customToDate = tmp;
+        }
+    }
+
+    private void RefreshDateLabels()
+    {
+        if (fromLabel != null && customFromDate.HasValue)
+            fromLabel.text = customFromDate.Value.ToString("yyyy-MM-dd");
+
+        if (toLabel != null && customToDate.HasValue)
+            toLabel.text = customToDate.Value.ToString("yyyy-MM-dd");
     }
 
     private bool IsReady()

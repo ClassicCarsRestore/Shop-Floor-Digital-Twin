@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using UnityEngine;
+using UnityEngine.UI;
 using Newtonsoft.Json;
 
 public class WarehouseLayoutController : MonoBehaviour
@@ -10,11 +11,48 @@ public class WarehouseLayoutController : MonoBehaviour
     [SerializeField] private StorageRepository storageRepository;
     [SerializeField] private WarehouseManager warehouseManager;
     [SerializeField] private GameObject sectionPrefabForLayout;
+    [SerializeField] private Button saveChangesButton;
+    [SerializeField] private Button cancelChangesButton;
 
     private WarehouseLayoutDTO lastLoadedLayout;
     private string lastLoadedLayoutJson;
     private bool isLoadingLayout;
     private bool isSavingLayout;
+    private bool isCancellingLayout;
+    private float nextButtonsRefreshTime;
+    private const float ButtonsRefreshInterval = 0.25f;
+
+    private void OnEnable()
+    {
+        RefreshActionButtons(true);
+    }
+
+    private void Update()
+    {
+        if (Time.unscaledTime < nextButtonsRefreshTime)
+            return;
+
+        nextButtonsRefreshTime = Time.unscaledTime + ButtonsRefreshInterval;
+        RefreshActionButtons();
+    }
+
+    private void RefreshActionButtons(bool force = false)
+    {
+        bool hasChanges = HasUnsavedChanges();
+        bool canClick = hasChanges && !isLoadingLayout && !isSavingLayout && !isCancellingLayout;
+
+        SetButtonInteractable(saveChangesButton, canClick, force);
+        SetButtonInteractable(cancelChangesButton, canClick, force);
+    }
+
+    private static void SetButtonInteractable(Button button, bool interactable, bool force = false)
+    {
+        if (button == null)
+            return;
+
+        if (force || button.interactable != interactable)
+            button.interactable = interactable;
+    }
 
     /// <summary>
     /// Layout carregado da BD (snapshot para Cancel All e deteção de alterações não guardadas).
@@ -51,6 +89,7 @@ public class WarehouseLayoutController : MonoBehaviour
         if (layoutRepository == null || warehouseManager == null)
         {
             Debug.LogWarning("[WarehouseLayoutController] layoutRepository ou warehouseManager não atribuídos.");
+            RefreshActionButtons();
             onDone?.Invoke();
             return;
         }
@@ -86,10 +125,28 @@ public class WarehouseLayoutController : MonoBehaviour
         if (errorMsg != null)
         {
             Debug.LogWarning("[WarehouseLayoutController] GetLayout error: " + errorMsg);
-            // Em caso de erro de rede/auth no GET, não limpamos a cena à força.
-            lastLoadedLayout = WarehouseLayoutSerializer.BuildFromRuntime(warehouseManager);
-            lastLoadedLayoutJson = JsonConvert.SerializeObject(lastLoadedLayout, Formatting.None);
-            Debug.Log("[WarehouseLayoutController][LOAD][END_WITH_ERROR] snapshot mantido do runtime atual");
+
+            if (layoutRepository != null && layoutRepository.TryGetCachedLayout(out var cachedLayout) && cachedLayout != null)
+            {
+                if (cachedLayout.sections == null)
+                    cachedLayout.sections = new System.Collections.Generic.List<SectionLayoutDTO>();
+
+                Debug.Log($"[WarehouseLayoutController][LOAD][FALLBACK_CACHE] sections={cachedLayout.sections.Count}");
+
+                if (sectionPrefabForLayout != null)
+                    WarehouseLayoutSerializer.ApplyLayout(cachedLayout, warehouseManager, sectionPrefabForLayout);
+
+                lastLoadedLayout = WarehouseLayoutSerializer.BuildFromRuntime(warehouseManager);
+                lastLoadedLayoutJson = JsonConvert.SerializeObject(lastLoadedLayout, Formatting.None);
+                Debug.Log("[WarehouseLayoutController][LOAD][END_WITH_ERROR_USING_CACHE]");
+            }
+            else
+            {
+                // Se não houver cache, mantém estado atual para evitar limpar a cena.
+                lastLoadedLayout = WarehouseLayoutSerializer.BuildFromRuntime(warehouseManager);
+                lastLoadedLayoutJson = JsonConvert.SerializeObject(lastLoadedLayout, Formatting.None);
+                Debug.Log("[WarehouseLayoutController][LOAD][END_WITH_ERROR_NO_CACHE] snapshot mantido do runtime atual");
+            }
         }
         else
         {
@@ -109,6 +166,7 @@ public class WarehouseLayoutController : MonoBehaviour
         }
 
         isLoadingLayout = false;
+        RefreshActionButtons();
 
         onDone?.Invoke();
     }
@@ -117,25 +175,34 @@ public class WarehouseLayoutController : MonoBehaviour
     {
         Debug.Log("[WarehouseLayoutController][PUT][REQUESTED]");
 
+        if (!HasUnsavedChanges())
+        {
+            Debug.Log("[WarehouseLayoutController][PUT] Sem alterações por guardar. Save ignorado.");
+            RefreshActionButtons();
+            return;
+        }
+
         if (isSavingLayout)
         {
             Debug.LogWarning("[WarehouseLayoutController] Save em progresso. Ignorado.");
+            RefreshActionButtons();
             return;
         }
 
         if (warehouseManager == null || layoutRepository == null)
         {
             Debug.LogWarning("[WarehouseLayoutController] warehouseManager ou layoutRepository não atribuídos.");
+            RefreshActionButtons();
             return;
         }
 
+        isSavingLayout = true;
+        RefreshActionButtons(true);
         StartCoroutine(DoRefreshItemsThenSave());
     }
 
     private IEnumerator DoRefreshItemsThenSave()
     {
-        isSavingLayout = true;
-
         bool refreshDone = false;
         bool preSyncOk = true;
 
@@ -172,6 +239,7 @@ public class WarehouseLayoutController : MonoBehaviour
         {
             Debug.LogWarning("[WarehouseLayoutController][PUT][ABORTED] Save cancelado: pré-sync de items falhou.");
             isSavingLayout = false;
+            RefreshActionButtons();
             yield break;
         }
 
@@ -203,37 +271,95 @@ public class WarehouseLayoutController : MonoBehaviour
             yield return null;
 
         isSavingLayout = false;
+        RefreshActionButtons();
     }
 
     public void OnClickCancelAll()
     {
+        if (isCancellingLayout)
+        {
+            Debug.LogWarning("[WarehouseLayoutController] Cancel em progresso. Ignorado.");
+            RefreshActionButtons();
+            return;
+        }
+
         if (isLoadingLayout)
         {
             Debug.LogWarning("[WarehouseLayoutController] Ainda a carregar layout. Tenta novamente em 1-2 segundos.");
+            RefreshActionButtons();
             return;
         }
 
         if (lastLoadedLayout == null)
         {
             Debug.LogWarning("[WarehouseLayoutController] Não há layout carregado para reverter.");
+            RefreshActionButtons();
             return;
         }
 
         if (!HasUnsavedChanges())
         {
             Debug.Log("[WarehouseLayoutController] Sem alterações por guardar. Cancel All ignorado.");
+            RefreshActionButtons();
             return;
         }
 
         if (warehouseManager == null || sectionPrefabForLayout == null)
         {
             Debug.LogWarning("[WarehouseLayoutController] warehouseManager ou sectionPrefabForLayout não atribuídos.");
+            RefreshActionButtons();
             return;
         }
+
+        isCancellingLayout = true;
+        RefreshActionButtons(true);
+        StartCoroutine(DoCancelAllPreserveBoxes());
+    }
+
+    private IEnumerator DoCancelAllPreserveBoxes()
+    {
+        System.Collections.Generic.List<StorageRowDTO> rowsSnapshot = null;
+        bool storageDone = false;
+
+        if (storageRepository != null)
+        {
+            Debug.Log("[WarehouseLayoutController][CANCEL][PRESERVE_BOXES][FETCH_ROWS_START]");
+
+            yield return StartCoroutine(storageRepository.GetAllStorage(
+                onSuccess: rows =>
+                {
+                    rowsSnapshot = rows ?? new System.Collections.Generic.List<StorageRowDTO>();
+                    Debug.Log($"[WarehouseLayoutController][CANCEL][PRESERVE_BOXES][FETCH_ROWS_OK] rows={rowsSnapshot.Count}");
+                    storageDone = true;
+                },
+                onError: err =>
+                {
+                    Debug.LogWarning("[WarehouseLayoutController][CANCEL][PRESERVE_BOXES][FETCH_ROWS_ERROR] " + err);
+                    storageDone = true;
+                }
+            ));
+        }
+        else
+        {
+            storageDone = true;
+            Debug.LogWarning("[WarehouseLayoutController][CANCEL][PRESERVE_BOXES] storageRepository não atribuído; sem snapshot de boxes.");
+        }
+
+        while (!storageDone)
+            yield return null;
 
         WarehouseLayoutSerializer.ApplyLayout(lastLoadedLayout, warehouseManager, sectionPrefabForLayout);
         lastLoadedLayout = WarehouseLayoutSerializer.BuildFromRuntime(warehouseManager);
         lastLoadedLayoutJson = JsonConvert.SerializeObject(lastLoadedLayout, Formatting.None);
+
+        if (rowsSnapshot != null)
+        {
+            warehouseManager.ShowAllStorage(rowsSnapshot);
+            Debug.Log($"[WarehouseLayoutController][CANCEL][PRESERVE_BOXES][REAPPLY_OK] rows={rowsSnapshot.Count}");
+        }
+
+        isCancellingLayout = false;
+        RefreshActionButtons();
         Debug.Log("[WarehouseLayoutController] Alterações revertidas (Cancel All).");
     }
 }

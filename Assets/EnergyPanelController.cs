@@ -388,6 +388,46 @@ public class EnergyPanelController : MonoBehaviour
         StartCoroutine(_RequestPowerTimeseriesCo(window, every, onOk, onErr));
     }
 
+    public void RequestPowerTimeseriesBetween(
+        DateTime fromInclusive,
+        DateTime toInclusive,
+        Action<EnergyUsageChartPayload> onOk,
+        Action<string> onErr)
+    {
+        if (toInclusive < fromInclusive)
+        {
+            DateTime tmp = fromInclusive;
+            fromInclusive = toInclusive;
+            toInclusive = tmp;
+        }
+
+        var fromUtc = fromInclusive.ToUniversalTime();
+        var toUtc = toInclusive.ToUniversalTime();
+
+        double totalHours = Math.Max(1d, (toUtc - fromUtc).TotalHours);
+        int windowHours = Mathf.Clamp((int)Math.Ceiling(totalHours) + 24, 1, 24 * 365);
+        string window = windowHours + "h";
+
+        string every;
+        if (totalHours <= 72d)
+            every = "1h";
+        else if (totalHours <= 24d * 14d)
+            every = "3h";
+        else
+            every = "1d";
+
+        RequestPowerTimeseries(
+            window,
+            every,
+            payload =>
+            {
+                var filtered = FilterPayloadByDateRange(payload, fromInclusive, toInclusive);
+                onOk?.Invoke(filtered);
+            },
+            onErr
+        );
+    }
+
     public void RequestEnergyDaySeries(
         string month,
         Action<EnergyDayResponse> onOk,
@@ -734,6 +774,84 @@ public class EnergyPanelController : MonoBehaviour
 
             onOk?.Invoke(payload);
         }
+    }
+
+    private EnergyUsageChartPayload FilterPayloadByDateRange(
+        EnergyUsageChartPayload payload,
+        DateTime fromInclusive,
+        DateTime toInclusive)
+    {
+        if (payload == null || payload.timestamps == null || payload.series == null)
+            return payload;
+
+        if (toInclusive < fromInclusive)
+        {
+            DateTime tmp = fromInclusive;
+            fromInclusive = toInclusive;
+            toInclusive = tmp;
+        }
+
+        DateTime fromDate = fromInclusive.Date;
+        DateTime toDate = toInclusive.Date;
+
+        var keepIdx = new List<int>();
+        for (int i = 0; i < payload.timestamps.Count; i++)
+        {
+            string ts = payload.timestamps[i];
+            if (!DateTime.TryParse(ts, null, DateTimeStyles.RoundtripKind, out var dt))
+                continue;
+
+            DateTime localDate = dt.ToLocalTime().Date;
+            if (localDate >= fromDate && localDate <= toDate)
+                keepIdx.Add(i);
+        }
+
+        if (keepIdx.Count == 0)
+            return payload;
+
+        var filtered = new EnergyUsageChartPayload
+        {
+            title = payload.title,
+            subtitle = $"{fromDate:yyyy-MM-dd} → {toDate:yyyy-MM-dd}",
+            unit = payload.unit,
+            categories = new List<string>(keepIdx.Count),
+            timestamps = new List<string>(keepIdx.Count),
+            series = new List<EnergyUsageSeries>(payload.series.Count)
+        };
+
+        for (int k = 0; k < keepIdx.Count; k++)
+        {
+            int idx = keepIdx[k];
+            filtered.timestamps.Add(payload.timestamps[idx]);
+
+            if (payload.categories != null && idx < payload.categories.Count)
+                filtered.categories.Add(payload.categories[idx]);
+            else
+                filtered.categories.Add((k + 1).ToString());
+        }
+
+        for (int s = 0; s < payload.series.Count; s++)
+        {
+            var src = payload.series[s];
+            if (src == null)
+                continue;
+
+            var vals = new List<float>(keepIdx.Count);
+            for (int k = 0; k < keepIdx.Count; k++)
+            {
+                int idx = keepIdx[k];
+                float v = (src.values != null && idx < src.values.Count) ? src.values[idx] : 0f;
+                vals.Add(v);
+            }
+
+            filtered.series.Add(new EnergyUsageSeries
+            {
+                name = src.name,
+                values = vals
+            });
+        }
+
+        return filtered;
     }
 
     private IEnumerator _RequestEnergyDaySeriesCo(

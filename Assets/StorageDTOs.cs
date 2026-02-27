@@ -12,11 +12,12 @@ public class StorageLocationDTO
 [Serializable]
 public class StorageRowDTO
 {
+    public string itemId;
     public string carId;
     public StorageLocationDTO location;
 }
 
-// Resposta típica: { "rows": [ ... ] }
+// Resposta tï¿½pica: { "rows": [ ... ] }
 [Serializable]
 public class StorageRowsResponseDTO
 {

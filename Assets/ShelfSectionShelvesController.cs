@@ -89,6 +89,22 @@ public class ShelfSectionShelvesController : MonoBehaviour
             return;
         }
 
+        var shelvesOrdered = shelvesRoot.GetComponentsInChildren<Shelf>(true)
+                                      .OrderBy(s => s.transform.position.y)
+                                      .ToList();
+        if (shelvesOrdered.Count == 0)
+        {
+            Debug.LogWarning("[ShelfSectionShelvesController] Não foram encontradas shelves válidas para remover.");
+            return;
+        }
+
+        var topShelf = shelvesOrdered[shelvesOrdered.Count - 1];
+        if (IsShelfOccupied(topShelf))
+        {
+            Debug.LogWarning("[ShelfSectionShelvesController] Não é possível remover shelf com caixas/áreas ocupadas.");
+            return;
+        }
+
         Transform lastContainer = shelvesRoot.GetChild(shelvesRoot.childCount - 1);
         Destroy(lastContainer.gameObject);
 
@@ -169,5 +185,24 @@ public class ShelfSectionShelvesController : MonoBehaviour
             bounds.Encapsulate(renderers[i].bounds);
 
         return bounds;
+    }
+
+    private static bool IsShelfOccupied(Shelf shelf)
+    {
+        if (shelf == null || shelf.Areas == null) return false;
+
+        foreach (var area in shelf.Areas)
+        {
+            if (area == null) continue;
+
+            if (area.IsOccupied())
+                return true;
+
+            var hasBox = area.GetComponentInChildren<StorageBox>(true) != null;
+            if (hasBox)
+                return true;
+        }
+
+        return false;
     }
 }

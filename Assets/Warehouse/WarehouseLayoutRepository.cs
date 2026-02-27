@@ -8,6 +8,7 @@ using Newtonsoft.Json.Linq;
 public class WarehouseLayoutRepository : MonoBehaviour
 {
     private const string LayoutUrl = "/inventory/warehouse/layout";
+    private const string LayoutCacheKey = "warehouse.layout.cache.v1";
 
     public IEnumerator GetLayout(Action<WarehouseLayoutDTO> onSuccess, Action<string> onError)
     {
@@ -36,6 +37,7 @@ public class WarehouseLayoutRepository : MonoBehaviour
             var dto = TryParseLayout(json);
             int sectionCount = dto?.sections != null ? dto.sections.Count : 0;
             Debug.Log($"[WarehouseLayoutRepository][GET][PARSE_OK] sections={sectionCount}");
+            SaveLayoutCache(json);
             onSuccess?.Invoke(dto);
         }
         catch (Exception e)
@@ -82,7 +84,37 @@ public class WarehouseLayoutRepository : MonoBehaviour
 
         Debug.Log("[WarehouseLayoutRepository][PUT][SUCCESS]");
 
+        try
+        {
+            string canonical = JsonConvert.SerializeObject(layout);
+            SaveLayoutCache(canonical);
+        }
+        catch { }
+
         onSuccess?.Invoke();
+    }
+
+    public bool TryGetCachedLayout(out WarehouseLayoutDTO layout)
+    {
+        layout = null;
+
+        if (!PlayerPrefs.HasKey(LayoutCacheKey))
+            return false;
+
+        try
+        {
+            string json = PlayerPrefs.GetString(LayoutCacheKey, string.Empty);
+            if (string.IsNullOrWhiteSpace(json))
+                return false;
+
+            layout = TryParseLayout(json);
+            return layout != null;
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("[WarehouseLayoutRepository] Falha ao ler cache de layout: " + e.Message);
+            return false;
+        }
     }
 
     private WarehouseLayoutDTO TryParseLayout(string json)
@@ -146,5 +178,21 @@ public class WarehouseLayoutRepository : MonoBehaviour
     private static WarehouseLayoutDTO EmptyLayout()
     {
         return new WarehouseLayoutDTO { sections = new System.Collections.Generic.List<SectionLayoutDTO>() };
+    }
+
+    private void SaveLayoutCache(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return;
+
+        try
+        {
+            PlayerPrefs.SetString(LayoutCacheKey, json);
+            PlayerPrefs.Save();
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("[WarehouseLayoutRepository] Falha ao guardar cache de layout: " + e.Message);
+        }
     }
 }

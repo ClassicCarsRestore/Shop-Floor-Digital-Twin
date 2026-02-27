@@ -37,6 +37,7 @@ public class WarehouseManager : MonoBehaviour
     public void ShowAllStorage(List<StorageRowDTO> rows)
     {
         ClearAllBoxes();
+        ResetAllAreasToFree();
 
         if (rows == null) return;
 
@@ -44,7 +45,7 @@ public class WarehouseManager : MonoBehaviour
         {
             if (row == null || row.location == null) continue;
 
-            SpawnBoxAt(row.carId, row.location, highlight: false);
+            SpawnBoxAt(row.itemId, row.carId, row.location, highlight: false);
         }
     }
 
@@ -116,7 +117,7 @@ public class WarehouseManager : MonoBehaviour
         {
             if (loc == null) continue;
 
-            SpawnBoxAt(carId, loc, highlight: true);
+            SpawnBoxAt(null, carId, loc, highlight: true);
         }
     }
 
@@ -190,7 +191,7 @@ public class WarehouseManager : MonoBehaviour
     // INTERNALS
     // ---------------------------
 
-    private void SpawnBoxAt(string carId, StorageLocationDTO loc, bool highlight)
+    private void SpawnBoxAt(string itemId, string carId, StorageLocationDTO loc, bool highlight)
     {
         var area = FindArea(loc.section, loc.shelf, loc.area);
         if (area == null)
@@ -227,6 +228,10 @@ public class WarehouseManager : MonoBehaviour
 
             // garantir tamanho/posição corretos no slot
             boxComp.FitToAreaSlot();
+
+            area.Status = "occupied";
+            area.ItemId = string.IsNullOrWhiteSpace(itemId) ? null : itemId;
+            area.UpdateVisual();
 
             boxesByLocation[key] = boxComp;
         }
@@ -294,6 +299,8 @@ public class WarehouseManager : MonoBehaviour
                 Destroy(kv.Value.gameObject);
         }
         boxesByLocation.Clear();
+
+        ResetAllAreasToFree();
     }
 
     private void SetAllHighlights(bool on)
@@ -302,6 +309,29 @@ public class WarehouseManager : MonoBehaviour
         {
             if (kv.Value != null)
                 kv.Value.Highlight(on);
+        }
+    }
+
+    private void ResetAllAreasToFree()
+    {
+        if (Sections == null) return;
+
+        foreach (var sec in Sections)
+        {
+            if (sec == null || sec.Shelves == null) continue;
+
+            foreach (var sh in sec.Shelves)
+            {
+                if (sh == null || sh.Areas == null) continue;
+
+                foreach (var ar in sh.Areas)
+                {
+                    if (ar == null) continue;
+                    ar.Status = "free";
+                    ar.ItemId = null;
+                    ar.UpdateVisual();
+                }
+            }
         }
     }
 
