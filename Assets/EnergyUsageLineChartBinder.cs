@@ -38,6 +38,11 @@ public class EnergyUsageLineChartBinder : MonoBehaviour
     [SerializeField] private float refreshSeconds = 60f;
     [SerializeField] private bool autoRefresh = true;
 
+    [Header("Axis")]
+    [SerializeField] private bool useFixedYAxisRange = false;
+    [SerializeField] private float fixedYAxisMin = 0f;
+    [SerializeField] private float fixedYAxisMax = 100f;
+
     [Header("Frontend cache (mínima)")]
     [SerializeField] private float todayCacheSeconds = 10f;
     [SerializeField] private float weekCacheSeconds = 30f;
@@ -178,6 +183,19 @@ public class EnergyUsageLineChartBinder : MonoBehaviour
         RefreshOnce();
     }
 
+    public void OnByDateClicked()
+    {
+        if (!customFromDate.HasValue || !customToDate.HasValue)
+        {
+            customToDate = DateTime.Today;
+            customFromDate = DateTime.Today.AddDays(-6);
+            RefreshDateLabels();
+        }
+
+        activeFilter = FilterMode.CustomRange;
+        RefreshOnce();
+    }
+
     public void OnFromClicked()
     {
         OpenDatePicker(true);
@@ -243,15 +261,16 @@ public class EnergyUsageLineChartBinder : MonoBehaviour
 
         NormalizeDateRange();
 
-        controller.RequestPowerTimeseriesBetween(
+        controller.RequestEnergyDayTimeseriesBetween(
             customFromDate.Value,
             customToDate.Value,
             payload =>
             {
                 if (payload != null)
                 {
-                    payload.title = "Energy Usage Chart";
-                    payload.subtitle = $"{customFromDate.Value:yyyy-MM-dd} → {customToDate.Value:yyyy-MM-dd}";
+                    payload.title = "Energy Usage Chart - By Date";
+                    if (string.IsNullOrWhiteSpace(payload.subtitle))
+                        payload.subtitle = $"{customFromDate.Value:yyyy-MM-dd} → {customToDate.Value:yyyy-MM-dd} (Power)";
                 }
                 ApplyToLineChart(payload);
             },
@@ -504,6 +523,10 @@ public class EnergyUsageLineChartBinder : MonoBehaviour
 
         chartData.title = payload.title;
         chartData.subtitle = payload.subtitle;
+        chartData.xAxisTitle = GetXAxisTitle(activeFilter);
+        chartData.yAxisTitle = GetYAxisTitle(activeFilter, payload.unit);
+
+        ApplyAxisRange();
 
         if (chartData.categoriesX == null) chartData.categoriesX = new List<string>();
         chartData.categoriesX.Clear();
@@ -550,5 +573,60 @@ public class EnergyUsageLineChartBinder : MonoBehaviour
 
         chartData.hasChanged = true;
         chart.UpdateChart();
+    }
+
+    private void ApplyAxisRange()
+    {
+        if (chart == null || chart.chartOptions == null || chart.chartOptions.yAxis == null)
+            return;
+
+        var yAxis = chart.chartOptions.yAxis;
+        if (useFixedYAxisRange)
+        {
+            yAxis.autoAxisRange = false;
+            yAxis.min = fixedYAxisMin;
+            yAxis.max = Mathf.Max(fixedYAxisMin + 0.001f, fixedYAxisMax);
+        }
+        else
+        {
+            yAxis.autoAxisRange = true;
+            yAxis.startFromZero = true;
+        }
+
+        chart.chartOptions.hasChanged = true;
+    }
+
+    private string GetXAxisTitle(FilterMode mode)
+    {
+        switch (mode)
+        {
+            case FilterMode.Today: return "Hour";
+            case FilterMode.ThisWeek: return "Day";
+            case FilterMode.ThisMonth: return "Week";
+            case FilterMode.CustomRange: return "Date/Time";
+            default: return "Date";
+        }
+    }
+
+    private string GetYAxisTitle(FilterMode mode, string payloadUnit)
+    {
+        switch (mode)
+        {
+            case FilterMode.Today: return "kWh / hour";
+            case FilterMode.ThisWeek: return "kWh / day";
+            case FilterMode.ThisMonth: return "kWh / week";
+            case FilterMode.CustomRange:
+                {
+                    var unit = string.IsNullOrWhiteSpace(payloadUnit) ? "W" : payloadUnit;
+                    if (string.Equals(unit, "kWh", StringComparison.OrdinalIgnoreCase))
+                        return "kWh / day";
+                    return unit;
+                }
+            default:
+                {
+                    var unit = string.IsNullOrWhiteSpace(payloadUnit) ? "kWh" : payloadUnit;
+                    return unit;
+                }
+        }
     }
 }

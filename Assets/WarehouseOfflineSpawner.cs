@@ -18,6 +18,7 @@ public class WarehouseDebugSpawner : MonoBehaviour
 
         int spawned = 0;
         int carCounter = 1;
+        var rowsToShow = new List<StorageRowDTO>();
 
         foreach (var sec in warehouseManager.Sections)
         {
@@ -45,6 +46,10 @@ public class WarehouseDebugSpawner : MonoBehaviour
                         // construir row/loc para o teu manager
                         var row = new StorageRowDTO
                         {
+                            itemId = itemId,
+                            itemName = itemId,
+                            itemState = "test",
+                            carModel = "test-model",
                             carId = carId,
                             location = new StorageLocationDTO
                             {
@@ -54,15 +59,14 @@ public class WarehouseDebugSpawner : MonoBehaviour
                             }
                         };
 
-                        warehouseManager.ShowAllStorage(new List<StorageRowDTO> { row });
-                        // ^ se preferires não limpar tudo, cria um método SpawnSingleRow no WarehouseManager.
-                        // alternativa: chamar um método público que só faça SpawnBoxAt sem ClearAllBoxes.
+                        rowsToShow.Add(row);
 
                         spawned++;
                         carCounter++;
 
                         if (spawned >= boxesToSpawn)
                         {
+                            warehouseManager.ShowAllStorage(rowsToShow);
                             Debug.Log($"[WarehouseDebugSpawner] Spawned {spawned} boxes.");
                             return;
                         }
@@ -70,6 +74,9 @@ public class WarehouseDebugSpawner : MonoBehaviour
                 }
             }
         }
+
+        if (rowsToShow.Count > 0)
+            warehouseManager.ShowAllStorage(rowsToShow);
 
         Debug.Log($"[WarehouseDebugSpawner] Spawned {spawned} boxes (acabaram áreas livres).");
     }

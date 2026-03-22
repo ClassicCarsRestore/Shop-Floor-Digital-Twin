@@ -39,6 +39,9 @@ public class EnergyPanelController : MonoBehaviour
     [SerializeField] private float cachePowerTimeseriesSeconds = 10f;
     [SerializeField] private float cacheEnergyDaySeriesSeconds = 120f;
 
+    [Header("Debug")]
+    [SerializeField] private bool debugEnergyEndpointLogs = false;
+
     [Serializable]
     public class EnergyDaySeriesResponse
     {
@@ -69,6 +72,10 @@ public class EnergyPanelController : MonoBehaviour
     private const string ID_LEFT = "shelly3EMPinturaEsquerda";
     private const string ID_SAND = "shelly3EMJatoAreia";
 
+    private const string LABEL_SAND = "Jato de Areia";
+    private const string LABEL_RIGHT = "Pintura Direita";
+    private const string LABEL_LEFT = "Pintura Esquerda";
+
     private Coroutine refreshCo;
 
     public event Action<OverviewResponse> OverviewUpdated;
@@ -80,6 +87,9 @@ public class EnergyPanelController : MonoBehaviour
     }
 
     private readonly Dictionary<string, FrontendCacheEntry> frontendCache = new Dictionary<string, FrontendCacheEntry>();
+
+    private BreakdownMonthResponse lastBreakdownMonth;
+    private EnergyTrendMonthsResponse lastTrendMonths;
 
     [Serializable]
     public class MetricPanelUI
@@ -376,7 +386,7 @@ public class EnergyPanelController : MonoBehaviour
         Action<string> onErr)
     {
         string safeWindow = string.IsNullOrWhiteSpace(window) ? "24h" : window;
-        string safeEvery = string.IsNullOrWhiteSpace(every) ? "1h" : every;
+        string safeEvery = NormalizeEveryForApi(every);
         string cacheKey = $"power_ts_{safeWindow}_{safeEvery}";
 
         if (TryGetFrontendCache(cacheKey, out EnergyUsageChartPayload cached))
@@ -385,7 +395,7 @@ public class EnergyPanelController : MonoBehaviour
             return;
         }
 
-        StartCoroutine(_RequestPowerTimeseriesCo(window, every, onOk, onErr));
+        StartCoroutine(_RequestPowerTimeseriesCo(safeWindow, safeEvery, onOk, onErr));
     }
 
     public void RequestPowerTimeseriesBetween(
@@ -405,27 +415,73 @@ public class EnergyPanelController : MonoBehaviour
         var toUtc = toInclusive.ToUniversalTime();
 
         double totalHours = Math.Max(1d, (toUtc - fromUtc).TotalHours);
-        int windowHours = Mathf.Clamp((int)Math.Ceiling(totalHours) + 24, 1, 24 * 365);
-        string window = windowHours + "h";
+        string every = SelectEveryForRange(totalHours);
+        string fromIso = fromUtc.ToString("o", CultureInfo.InvariantCulture);
+        string toIso = toUtc.ToString("o", CultureInfo.InvariantCulture);
 
-        string every;
-        if (totalHours <= 72d)
-            every = "1h";
-        else if (totalHours <= 24d * 14d)
-            every = "3h";
-        else
-            every = "1d";
+        string cacheKey = $"power_ts_range_{fromIso}_{toIso}_{every}";
+        if (TryGetFrontendCache(cacheKey, out EnergyUsageChartPayload cached))
+        {
+            var adaptedCached = AdaptCustomRangeXAxis(cached, fromInclusive, toInclusive);
+            if (adaptedCached == null || adaptedCached.categories == null || adaptedCached.categories.Count == 0)
+                adaptedCached = BuildEmptyCustomRangePayload(fromInclusive, toInclusive, cached);
 
-        RequestPowerTimeseries(
-            window,
+            onOk?.Invoke(adaptedCached);
+            return;
+        }
+
+        StartCoroutine(_RequestPowerTimeseriesCo(
+            null,
             every,
             payload =>
             {
-                var filtered = FilterPayloadByDateRange(payload, fromInclusive, toInclusive);
-                onOk?.Invoke(filtered);
+                SetFrontendCache(cacheKey, payload, cachePowerTimeseriesSeconds);
+
+                var adapted = AdaptCustomRangeXAxis(payload, fromInclusive, toInclusive);
+                if (adapted == null || adapted.categories == null || adapted.categories.Count == 0)
+                    adapted = BuildEmptyCustomRangePayload(fromInclusive, toInclusive, payload);
+
+                onOk?.Invoke(adapted);
             },
-            onErr
-        );
+            err =>
+            {
+                if (IsNoDataError(err))
+                {
+                    onOk?.Invoke(BuildEmptyCustomRangePayload(fromInclusive, toInclusive, null));
+                    return;
+                }
+
+                onErr?.Invoke(err);
+            },
+            fromIso,
+            toIso
+        ));
+    }
+
+    public void RequestEnergyDayTimeseriesBetween(
+        DateTime fromInclusive,
+        DateTime toInclusive,
+        Action<EnergyUsageChartPayload> onOk,
+        Action<string> onErr)
+    {
+        if (toInclusive < fromInclusive)
+        {
+            DateTime tmp = fromInclusive;
+            fromInclusive = toInclusive;
+            toInclusive = tmp;
+        }
+
+        DateTime fromDate = fromInclusive.Date;
+        DateTime toDate = toInclusive.Date;
+        string cacheKey = $"energy_day_range_{fromDate:yyyyMMdd}_{toDate:yyyyMMdd}";
+
+        if (TryGetFrontendCache(cacheKey, out EnergyUsageChartPayload cached))
+        {
+            onOk?.Invoke(cached);
+            return;
+        }
+
+        StartCoroutine(_RequestEnergyDayTimeseriesBetweenCo(fromDate, toDate, cacheKey, onOk, onErr));
     }
 
     public void RequestEnergyDaySeries(
@@ -498,6 +554,7 @@ public class EnergyPanelController : MonoBehaviour
             data =>
             {
                 if (data == null) { ApplyErrorState(); return; }
+                LogOverviewIfEnabled(data);
                 ApplyToUI(data);
                 OverviewUpdated?.Invoke(data);
             },
@@ -522,6 +579,10 @@ public class EnergyPanelController : MonoBehaviour
                     onError?.Invoke("Empty response");
                     return;
                 }
+
+                lastBreakdownMonth = data;
+                LogBreakdownIfEnabled(data);
+                LogCrossEndpointConsistencyIfEnabled();
 
                 SetFrontendCache("breakdown_month", data, cacheBreakdownMonthSeconds);
                 onSuccess?.Invoke(data);
@@ -599,6 +660,10 @@ public class EnergyPanelController : MonoBehaviour
                 yield break;
             }
 
+            lastTrendMonths = data;
+            LogTrendMonthsIfEnabled(data);
+            LogCrossEndpointConsistencyIfEnabled();
+
             int n = Mathf.Min(data.labels.Length, data.values.Length);
             if (n <= 0)
             {
@@ -631,11 +696,26 @@ public class EnergyPanelController : MonoBehaviour
         string window,
         string every,
         Action<EnergyUsageChartPayload> onOk,
-        Action<string> onErr)
+        Action<string> onErr,
+        string fromIso = null,
+        string toIso = null)
     {
+        string safeEvery = NormalizeEveryForApi(every);
+
+        bool hasAbsoluteRange = !string.IsNullOrWhiteSpace(fromIso) && !string.IsNullOrWhiteSpace(toIso);
         string safeWindow = string.IsNullOrWhiteSpace(window) ? "24h" : window;
-        string safeEvery = string.IsNullOrWhiteSpace(every) ? "1h" : every;
-        string url = apiBaseUrl.TrimEnd('/') + "/energy/timeseries/power?window=" + safeWindow + "&every=" + safeEvery;
+
+        string url;
+        if (hasAbsoluteRange)
+        {
+            string safeFrom = UnityWebRequest.EscapeURL(fromIso);
+            string safeTo = UnityWebRequest.EscapeURL(toIso);
+            url = apiBaseUrl.TrimEnd('/') + "/energy/timeseries/power?from=" + safeFrom + "&to=" + safeTo + "&every=" + safeEvery;
+        }
+        else
+        {
+            url = apiBaseUrl.TrimEnd('/') + "/energy/timeseries/power?window=" + safeWindow + "&every=" + safeEvery;
+        }
 
         using (UnityWebRequest req = UnityWebRequest.Get(url))
         {
@@ -721,7 +801,7 @@ public class EnergyPanelController : MonoBehaviour
                 var raw = timeKeys[i];
                 if (DateTime.TryParse(raw, null, DateTimeStyles.RoundtripKind, out var dt))
                 {
-                    if (safeEvery == "3h")
+                    if (safeEvery == "1m" || safeEvery == "3h")
                     {
                         categories.Add(dt.ToLocalTime().ToString("HH:mm"));
                     }
@@ -745,7 +825,9 @@ public class EnergyPanelController : MonoBehaviour
             var payload = new EnergyUsageChartPayload
             {
                 title = "Energy Usage Chart",
-                subtitle = $"Window: {safeWindow} | Step: {safeEvery}",
+                subtitle = hasAbsoluteRange
+                    ? $"Range: {fromIso} → {toIso} | Step: {safeEvery}"
+                    : $"Window: {safeWindow} | Step: {safeEvery}",
                 unit = string.IsNullOrWhiteSpace(data.unit) ? "W" : data.unit,
                 categories = categories,
                 timestamps = new List<string>(timeKeys),
@@ -770,7 +852,8 @@ public class EnergyPanelController : MonoBehaviour
                 });
             }
 
-            SetFrontendCache($"power_ts_{safeWindow}_{safeEvery}", payload, cachePowerTimeseriesSeconds);
+            if (!hasAbsoluteRange)
+                SetFrontendCache($"power_ts_{safeWindow}_{safeEvery}", payload, cachePowerTimeseriesSeconds);
 
             onOk?.Invoke(payload);
         }
@@ -807,7 +890,17 @@ public class EnergyPanelController : MonoBehaviour
         }
 
         if (keepIdx.Count == 0)
-            return payload;
+        {
+            return new EnergyUsageChartPayload
+            {
+                title = payload.title,
+                subtitle = payload.subtitle,
+                unit = payload.unit,
+                categories = new List<string>(),
+                timestamps = new List<string>(),
+                series = payload.series != null ? new List<EnergyUsageSeries>(payload.series.Count) : new List<EnergyUsageSeries>()
+            };
+        }
 
         var filtered = new EnergyUsageChartPayload
         {
@@ -892,6 +985,160 @@ public class EnergyPanelController : MonoBehaviour
             SetFrontendCache($"energy_day_{safeMonth}", data, cacheEnergyDaySeriesSeconds);
 
             onOk?.Invoke(data);
+        }
+    }
+
+    private IEnumerator _RequestEnergyDayTimeseriesBetweenCo(
+        DateTime fromDate,
+        DateTime toDate,
+        string cacheKey,
+        Action<EnergyUsageChartPayload> onOk,
+        Action<string> onErr)
+    {
+        var labelsByMeter = new Dictionary<string, string>
+        {
+            { ID_SAND, LABEL_SAND },
+            { ID_RIGHT, LABEL_RIGHT },
+            { ID_LEFT, LABEL_LEFT }
+        };
+
+        var valuesByMeterDate = new Dictionary<string, Dictionary<DateTime, float>>
+        {
+            { ID_SAND, new Dictionary<DateTime, float>() },
+            { ID_RIGHT, new Dictionary<DateTime, float>() },
+            { ID_LEFT, new Dictionary<DateTime, float>() }
+        };
+
+        string unit = "kWh";
+
+        DateTime monthCursor = new DateTime(fromDate.Year, fromDate.Month, 1);
+        DateTime monthEnd = new DateTime(toDate.Year, toDate.Month, 1);
+
+        while (monthCursor <= monthEnd)
+        {
+            string safeMonth = monthCursor.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+            string monthCacheKey = $"energy_day_{safeMonth}";
+
+            EnergyDayResponse monthData;
+            if (!TryGetFrontendCache(monthCacheKey, out monthData))
+            {
+                string url = apiBaseUrl.TrimEnd('/') + "/energy/timeseries/energy/day?month=" + safeMonth;
+
+                using (UnityWebRequest req = UnityWebRequest.Get(url))
+                {
+                    req.timeout = requestTimeoutSeconds;
+                    yield return req.SendWebRequest();
+
+                    if (req.result != UnityWebRequest.Result.Success)
+                    {
+                        onErr?.Invoke($"API error: {req.responseCode} {req.error} ({url})");
+                        yield break;
+                    }
+
+                    try { monthData = JsonUtility.FromJson<EnergyDayResponse>(req.downloadHandler.text); }
+                    catch (Exception e)
+                    {
+                        onErr?.Invoke($"JSON parse failed: {e.Message}");
+                        yield break;
+                    }
+
+                    if (monthData == null || monthData.meters == null)
+                    {
+                        onErr?.Invoke("Invalid payload from API.");
+                        yield break;
+                    }
+
+                    SetFrontendCache(monthCacheKey, monthData, cacheEnergyDaySeriesSeconds);
+                }
+            }
+
+            if (monthData != null)
+            {
+                if (!string.IsNullOrWhiteSpace(monthData.unit))
+                    unit = monthData.unit;
+
+                MergeEnergyDayMeter(monthData.meters.shelly3EMJatoAreia, ID_SAND, labelsByMeter, valuesByMeterDate, fromDate, toDate);
+                MergeEnergyDayMeter(monthData.meters.shelly3EMPinturaDireita, ID_RIGHT, labelsByMeter, valuesByMeterDate, fromDate, toDate);
+                MergeEnergyDayMeter(monthData.meters.shelly3EMPinturaEsquerda, ID_LEFT, labelsByMeter, valuesByMeterDate, fromDate, toDate);
+            }
+
+            monthCursor = monthCursor.AddMonths(1);
+        }
+
+        int dayCount = Mathf.Max(1, (toDate - fromDate).Days + 1);
+        var categories = new List<string>(dayCount);
+        var timestamps = new List<string>(dayCount);
+
+        for (int i = 0; i < dayCount; i++)
+        {
+            DateTime d = fromDate.AddDays(i);
+            categories.Add(d.ToString("dd/MM"));
+            timestamps.Add(d.ToString("yyyy-MM-dd'T'00:00:00K", CultureInfo.InvariantCulture));
+        }
+
+        var payload = new EnergyUsageChartPayload
+        {
+            title = "Energy Usage Chart - By Date",
+            subtitle = $"{fromDate:yyyy-MM-dd} → {toDate:yyyy-MM-dd} (Energy/day)",
+            unit = string.IsNullOrWhiteSpace(unit) ? "kWh" : unit,
+            categories = categories,
+            timestamps = timestamps,
+            series = new List<EnergyUsageSeries>(3)
+        };
+
+        string[] meterOrder = { ID_SAND, ID_RIGHT, ID_LEFT };
+        for (int m = 0; m < meterOrder.Length; m++)
+        {
+            string meterId = meterOrder[m];
+            var meterValues = valuesByMeterDate[meterId];
+            var values = new List<float>(dayCount);
+
+            for (int i = 0; i < dayCount; i++)
+            {
+                DateTime d = fromDate.AddDays(i);
+                values.Add(meterValues.TryGetValue(d, out var v) ? Mathf.Max(0f, v) : 0f);
+            }
+
+            payload.series.Add(new EnergyUsageSeries
+            {
+                name = labelsByMeter.TryGetValue(meterId, out var label) ? label : meterId,
+                values = values
+            });
+        }
+
+        payload = AdaptCustomRangeXAxis(payload, fromDate, toDate);
+        SetFrontendCache(cacheKey, payload, cacheEnergyDaySeriesSeconds);
+        onOk?.Invoke(payload);
+    }
+
+    private void MergeEnergyDayMeter(
+        EnergyDayMeter meter,
+        string meterId,
+        Dictionary<string, string> labelsByMeter,
+        Dictionary<string, Dictionary<DateTime, float>> valuesByMeterDate,
+        DateTime fromDate,
+        DateTime toDate)
+    {
+        if (meter == null) return;
+
+        if (!string.IsNullOrWhiteSpace(meter.label))
+            labelsByMeter[meterId] = meter.label;
+
+        if (meter.points == null || !valuesByMeterDate.TryGetValue(meterId, out var dst))
+            return;
+
+        for (int i = 0; i < meter.points.Length; i++)
+        {
+            var p = meter.points[i];
+            if (p == null || string.IsNullOrWhiteSpace(p.date)) continue;
+
+            if (!DateTime.TryParseExact(p.date, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
+                continue;
+
+            DateTime day = d.Date;
+            if (day < fromDate || day > toDate) continue;
+
+            dst[day] = Mathf.Max(0f, p.value);
         }
     }
 
@@ -1063,6 +1310,136 @@ public class EnergyPanelController : MonoBehaviour
         return apiBaseUrl.TrimEnd('/') + path;
     }
 
+    private void LogOverviewIfEnabled(OverviewResponse data)
+    {
+        if (!debugEnergyEndpointLogs || data == null || data.total == null)
+            return;
+
+        float rightMonth = 0f;
+        float leftMonth = 0f;
+        float sandMonth = 0f;
+
+        if (data.meters != null)
+        {
+            for (int i = 0; i < data.meters.Length; i++)
+            {
+                var meter = data.meters[i];
+                if (meter == null) continue;
+
+                if (meter.id == ID_RIGHT) rightMonth = Mathf.Max(0f, meter.month_energy_kwh);
+                else if (meter.id == ID_LEFT) leftMonth = Mathf.Max(0f, meter.month_energy_kwh);
+                else if (meter.id == ID_SAND) sandMonth = Mathf.Max(0f, meter.month_energy_kwh);
+            }
+        }
+
+        Debug.Log(
+            "[EnergyDebug][Overview] " +
+            $"generated_at={data.generated_at}, total_current_w={data.total.current_power_w:0.###}, total_month_kwh={Mathf.Max(0f, data.total.month_energy_kwh):0.###}, " +
+            $"right_month_kwh={rightMonth:0.###}, left_month_kwh={leftMonth:0.###}, sand_month_kwh={sandMonth:0.###}"
+        );
+    }
+
+    private void LogBreakdownIfEnabled(BreakdownMonthResponse data)
+    {
+        if (!debugEnergyEndpointLogs || data == null)
+            return;
+
+        int n = Mathf.Min(
+            data.labels != null ? data.labels.Count : 0,
+            data.values != null ? data.values.Count : 0
+        );
+
+        float sum = 0f;
+        var parts = new List<string>(n);
+        for (int i = 0; i < n; i++)
+        {
+            float v = Mathf.Max(0f, data.values[i]);
+            sum += v;
+            parts.Add($"{data.labels[i]}={v:0.###}");
+        }
+
+        Debug.Log(
+            "[EnergyDebug][BreakdownMonth] " +
+            $"period={data.period}, unit={data.unit}, api_total_kwh={Mathf.Max(0f, data.total_kwh):0.###}, computed_sum_kwh={sum:0.###}, items=[{string.Join(" | ", parts)}]"
+        );
+    }
+
+    private void LogTrendMonthsIfEnabled(EnergyTrendMonthsResponse data)
+    {
+        if (!debugEnergyEndpointLogs || data == null || data.labels == null || data.values == null)
+            return;
+
+        int n = Mathf.Min(data.labels.Length, data.values.Length);
+        var parts = new List<string>(n);
+        for (int i = 0; i < n; i++)
+            parts.Add($"{data.labels[i]}={Mathf.Max(0f, data.values[i]):0.###}");
+
+        Debug.Log(
+            "[EnergyDebug][TrendMonths] " +
+            $"months={data.months}, unit={data.unit}, points=[{string.Join(" | ", parts)}]"
+        );
+    }
+
+    private void LogCrossEndpointConsistencyIfEnabled()
+    {
+        if (!debugEnergyEndpointLogs || lastBreakdownMonth == null || lastTrendMonths == null)
+            return;
+
+        string period = lastBreakdownMonth.period;
+        if (string.IsNullOrWhiteSpace(period) || period.Length < 7)
+            return;
+
+        string yearMonth = period.Substring(0, 7); // yyyy-MM
+        float breakdownTotal = Mathf.Max(0f, lastBreakdownMonth.total_kwh);
+
+        int n = Mathf.Min(lastTrendMonths.labels != null ? lastTrendMonths.labels.Length : 0, lastTrendMonths.values != null ? lastTrendMonths.values.Length : 0);
+        float? trendValue = null;
+
+        for (int i = 0; i < n; i++)
+        {
+            if (TryExtractYearMonth(lastTrendMonths.labels[i], out string ym) && ym == yearMonth)
+            {
+                trendValue = Mathf.Max(0f, lastTrendMonths.values[i]);
+                break;
+            }
+        }
+
+        if (!trendValue.HasValue)
+        {
+            Debug.Log($"[EnergyDebug][Consistency] breakdown_period={period} not found in trend labels.");
+            return;
+        }
+
+        float diff = trendValue.Value - breakdownTotal;
+        float abs = Mathf.Abs(diff);
+        float pct = breakdownTotal > 0.0001f ? (abs / breakdownTotal) * 100f : 0f;
+
+        Debug.Log(
+            "[EnergyDebug][Consistency] " +
+            $"month={yearMonth}, trend_value={trendValue.Value:0.###}, breakdown_total={breakdownTotal:0.###}, " +
+            $"abs_diff={abs:0.###}, pct_diff={pct:0.##}%, trend_unit={lastTrendMonths.unit}, breakdown_unit={lastBreakdownMonth.unit}"
+        );
+    }
+
+    private bool TryExtractYearMonth(string label, out string yearMonth)
+    {
+        yearMonth = null;
+        if (string.IsNullOrWhiteSpace(label))
+            return false;
+
+        DateTime parsed;
+        if (DateTime.TryParse(label, CultureInfo.CurrentCulture, DateTimeStyles.AllowWhiteSpaces, out parsed)
+            || DateTime.TryParse(label, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out parsed)
+            || DateTime.TryParse(label, new CultureInfo("pt-PT"), DateTimeStyles.AllowWhiteSpaces, out parsed)
+            || DateTime.TryParse(label, new CultureInfo("en-US"), DateTimeStyles.AllowWhiteSpaces, out parsed))
+        {
+            yearMonth = parsed.ToString("yyyy-MM");
+            return true;
+        }
+
+        return false;
+    }
+
     // ----------- UI apply -----------
 
     private void ApplyToUI(OverviewResponse data)
@@ -1132,8 +1509,278 @@ public class EnergyPanelController : MonoBehaviour
         if (monthSandBlastPanel != null) monthSandBlastPanel.Set("This Month Sand Blasting Usage", na);
     }
 
-    private string FormatW(float w) => $"{w:0.##} W";
-    private string FormatKwh(float k) => $"{k:0.###} kWh";
+    private string FormatW(float w) => $"{Mathf.Max(0f, w):0.##} W";
+    private string FormatKwh(float k) => $"{Mathf.Max(0f, k):0.###} kWh";
+
+    private string SelectEveryForRange(double totalHours)
+    {
+        if (totalHours <= 24d)
+            return "1h";
+        if (totalHours <= 24d * 10d)
+            return "3h";
+        if (totalHours <= 24d * 120d)
+            return "1d";
+        return "7d";
+    }
+
+    private EnergyUsageChartPayload AdaptCustomRangeXAxis(
+        EnergyUsageChartPayload payload,
+        DateTime fromInclusive,
+        DateTime toInclusive)
+    {
+        if (payload == null || payload.timestamps == null || payload.categories == null)
+            return payload;
+
+        if (payload.timestamps.Count == 0 || payload.categories.Count == 0)
+            return payload;
+
+        if (toInclusive < fromInclusive)
+        {
+            DateTime tmp = fromInclusive;
+            fromInclusive = toInclusive;
+            toInclusive = tmp;
+        }
+
+        DateTime fromLocal = fromInclusive.ToLocalTime();
+        DateTime toLocal = toInclusive.ToLocalTime();
+
+        GetAdaptiveAxisPlan(fromLocal, toLocal, out int stepHours, out int stepDays, out int stepMonths, out string labelFormat, out string stepLabel);
+
+        int previousBucket = int.MinValue;
+        int lastNonEmpty = -1;
+
+        for (int i = 0; i < payload.timestamps.Count; i++)
+        {
+            if (!DateTime.TryParse(payload.timestamps[i], null, DateTimeStyles.RoundtripKind, out var dt))
+            {
+                payload.categories[i] = i == 0 ? payload.categories[i] : string.Empty;
+                continue;
+            }
+
+            DateTime local = dt.ToLocalTime();
+            int bucket = GetAxisBucket(local, fromLocal, stepHours, stepDays, stepMonths);
+            bool shouldShow = i == 0 || bucket != previousBucket;
+            payload.categories[i] = shouldShow ? local.ToString(labelFormat) : string.Empty;
+
+            if (shouldShow)
+            {
+                previousBucket = bucket;
+                lastNonEmpty = i;
+            }
+        }
+
+        if (payload.categories.Count > 0)
+        {
+            int last = payload.categories.Count - 1;
+            if (string.IsNullOrEmpty(payload.categories[last]) && DateTime.TryParse(payload.timestamps[last], null, DateTimeStyles.RoundtripKind, out var dtLast))
+            {
+                payload.categories[last] = dtLast.ToLocalTime().ToString(labelFormat);
+            }
+            else if (lastNonEmpty < 0)
+            {
+                payload.categories[last] = payload.categories[last];
+            }
+        }
+
+        payload.subtitle = $"{fromLocal:yyyy-MM-dd} → {toLocal:yyyy-MM-dd} (Power, step {stepLabel})";
+        return payload;
+    }
+
+    private EnergyUsageChartPayload BuildEmptyCustomRangePayload(
+        DateTime fromInclusive,
+        DateTime toInclusive,
+        EnergyUsageChartPayload template)
+    {
+        if (toInclusive < fromInclusive)
+        {
+            DateTime tmp = fromInclusive;
+            fromInclusive = toInclusive;
+            toInclusive = tmp;
+        }
+
+        DateTime fromLocal = fromInclusive.ToLocalTime();
+        DateTime toLocal = toInclusive.ToLocalTime();
+
+        var timeline = BuildAdaptiveTimeline(fromLocal, toLocal, out string labelFormat, out string stepLabel);
+        if (timeline.Count == 0)
+            timeline.Add(fromLocal);
+
+        var categories = new List<string>(timeline.Count);
+        var timestamps = new List<string>(timeline.Count);
+        for (int i = 0; i < timeline.Count; i++)
+        {
+            categories.Add(timeline[i].ToString(labelFormat));
+            timestamps.Add(timeline[i].ToUniversalTime().ToString("o"));
+        }
+
+        var seriesNames = GetSeriesNamesOrDefault(template);
+        var series = new List<EnergyUsageSeries>(seriesNames.Count);
+
+        for (int s = 0; s < seriesNames.Count; s++)
+        {
+            var values = new List<float>(timeline.Count);
+            for (int i = 0; i < timeline.Count; i++)
+                values.Add(0f);
+
+            series.Add(new EnergyUsageSeries
+            {
+                name = seriesNames[s],
+                values = values
+            });
+        }
+
+        return new EnergyUsageChartPayload
+        {
+            title = "Energy Usage Chart",
+            subtitle = $"{fromLocal:yyyy-MM-dd} → {toLocal:yyyy-MM-dd} (Power, step {stepLabel}, no data yet)",
+            unit = template != null && !string.IsNullOrWhiteSpace(template.unit) ? template.unit : "W",
+            categories = categories,
+            timestamps = timestamps,
+            series = series
+        };
+    }
+
+    private List<string> GetSeriesNamesOrDefault(EnergyUsageChartPayload template)
+    {
+        var names = new List<string>();
+
+        if (template != null && template.series != null)
+        {
+            for (int i = 0; i < template.series.Count; i++)
+            {
+                var s = template.series[i];
+                if (s == null || string.IsNullOrWhiteSpace(s.name))
+                    continue;
+                if (!names.Contains(s.name))
+                    names.Add(s.name);
+            }
+        }
+
+        if (names.Count == 0)
+        {
+            names.Add(LABEL_SAND);
+            names.Add(LABEL_RIGHT);
+            names.Add(LABEL_LEFT);
+        }
+
+        return names;
+    }
+
+    private List<DateTime> BuildAdaptiveTimeline(DateTime fromLocal, DateTime toLocal, out string labelFormat, out string stepLabel)
+    {
+        GetAdaptiveAxisPlan(fromLocal, toLocal, out int stepHours, out int stepDays, out int stepMonths, out labelFormat, out stepLabel);
+
+        var ticks = new List<DateTime>();
+        DateTime cursor = fromLocal;
+        int guard = 0;
+
+        while (cursor <= toLocal && guard < 2000)
+        {
+            ticks.Add(cursor);
+
+            if (stepHours > 0) cursor = cursor.AddHours(stepHours);
+            else if (stepDays > 0) cursor = cursor.AddDays(stepDays);
+            else cursor = cursor.AddMonths(stepMonths);
+
+            guard++;
+        }
+
+        if (ticks.Count == 0 || ticks[ticks.Count - 1] < toLocal)
+            ticks.Add(toLocal);
+
+        return ticks;
+    }
+
+    private void GetAdaptiveAxisPlan(
+        DateTime fromLocal,
+        DateTime toLocal,
+        out int stepHours,
+        out int stepDays,
+        out int stepMonths,
+        out string labelFormat,
+        out string stepLabel)
+    {
+        double totalDays = Math.Max(1d / 24d, (toLocal - fromLocal).TotalDays);
+
+        stepHours = 0;
+        stepDays = 0;
+        stepMonths = 0;
+
+        if (totalDays <= 1.5d)
+        {
+            stepHours = 1;
+            labelFormat = "HH:mm";
+            stepLabel = "1h";
+            return;
+        }
+
+        if (totalDays <= 3.5d)
+        {
+            stepHours = 12;
+            labelFormat = "dd/MM HH:mm";
+            stepLabel = "12h";
+            return;
+        }
+
+        if (totalDays <= 45d)
+        {
+            stepDays = 1;
+            labelFormat = "dd/MM";
+            stepLabel = "1d";
+            return;
+        }
+
+        if (totalDays <= 120d)
+        {
+            stepDays = 15;
+            labelFormat = "dd/MM";
+            stepLabel = "15d";
+            return;
+        }
+
+        if (totalDays <= 365d)
+        {
+            stepMonths = 1;
+            labelFormat = "MM/yyyy";
+            stepLabel = "1mo";
+            return;
+        }
+
+        stepMonths = 3;
+        labelFormat = "MM/yyyy";
+        stepLabel = "3mo";
+    }
+
+    private int GetAxisBucket(DateTime pointLocal, DateTime fromLocal, int stepHours, int stepDays, int stepMonths)
+    {
+        if (stepHours > 0)
+            return Mathf.Max(0, (int)Math.Floor((pointLocal - fromLocal).TotalHours / stepHours));
+
+        if (stepDays > 0)
+            return Mathf.Max(0, (int)Math.Floor((pointLocal.Date - fromLocal.Date).TotalDays / stepDays));
+
+        int months = (pointLocal.Year - fromLocal.Year) * 12 + (pointLocal.Month - fromLocal.Month);
+        return Mathf.Max(0, months / Mathf.Max(1, stepMonths));
+    }
+
+    private bool IsNoDataError(string err)
+    {
+        if (string.IsNullOrWhiteSpace(err)) return false;
+        return err.IndexOf("no data", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    private string NormalizeEveryForApi(string every)
+    {
+        if (string.IsNullOrWhiteSpace(every))
+            return "1h";
+
+        string normalized = every.Trim().ToLowerInvariant();
+
+        if (normalized == "1m" || normalized == "1h" || normalized == "3h" || normalized == "1d" || normalized == "7d")
+            return normalized;
+
+        return "1h";
+    }
 
 
 

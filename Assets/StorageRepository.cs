@@ -8,18 +8,52 @@ using Newtonsoft.Json.Linq;
 
 public class StorageRepository : MonoBehaviour
 {
-    // Chamada relativa ao teu site -> Caddy -> Authentik -> reverse_proxy
-    private const string ItemsUrl = "/inventory/items/?skip=0&limit=50";
+    // Chamada relativa ao site -> Caddy -> Authentik -> reverse_proxy
+    private const string DefaultItemsBaseUrl = "/inventory/items/";
     private const string ItemsCacheKey = "warehouse.storage.rows.cache.v1";
+
+    [Header("Items Query")]
+    [SerializeField, Min(1)] private int defaultItemsLimit = 150;
+
+    [Header("Benchmark/Debug (optional)")]
+    [SerializeField] private string allStorageUrlOverride = string.Empty;
+    [SerializeField] private string itemsByCharterUrlTemplateOverride = string.Empty;
+
+    public bool LastGetAllUsedCacheFallback { get; private set; }
+    public bool LastGetAllHadError { get; private set; }
+
+    public void SetRequestUrlOverrides(string allStorageUrl, string itemsByCharterTemplate)
+    {
+        allStorageUrlOverride = allStorageUrl ?? string.Empty;
+        itemsByCharterUrlTemplateOverride = itemsByCharterTemplate ?? string.Empty;
+    }
+
+    public void ClearRequestUrlOverrides()
+    {
+        allStorageUrlOverride = string.Empty;
+        itemsByCharterUrlTemplateOverride = string.Empty;
+    }
 
     public IEnumerator GetAllStorage(Action<List<StorageRowDTO>> onSuccess, Action<string> onError)
     {
-        Debug.Log("[StorageRepository] GET " + ItemsUrl);
-        yield return GetItems(ItemsUrl, onSuccess, onError);
+        LastGetAllUsedCacheFallback = false;
+        LastGetAllHadError = false;
+
+        string url = !string.IsNullOrWhiteSpace(allStorageUrlOverride)
+            ? allStorageUrlOverride
+            : BuildDefaultItemsUrl();
+        Debug.Log("[StorageRepository] GET " + url);
+        yield return GetItems(url, onSuccess, onError);
     }
 
-    // ✅ AGORA: endpoint leve por project_id (carro)
-    // Swagger: GET /projects/{project_id}/locations
+    private string BuildDefaultItemsUrl()
+    {
+        int safeLimit = Mathf.Max(1, defaultItemsLimit);
+        return $"{DefaultItemsBaseUrl}?skip=0&limit={safeLimit}";
+    }
+
+    // ✅ Endpoint por carro
+    // Swagger: GET /items/?charter_id={carId}
     public IEnumerator GetStorageForCar(string carId, Action<List<StorageRowDTO>> onSuccess, Action<string> onError)
     {
         if (string.IsNullOrWhiteSpace(carId))
@@ -28,10 +62,21 @@ public class StorageRepository : MonoBehaviour
             yield break;
         }
 
-        string url = $"/inventory/projects/{UnityWebRequest.EscapeURL(carId)}/locations";
+        string url;
+        if (!string.IsNullOrWhiteSpace(itemsByCharterUrlTemplateOverride))
+        {
+            string template = itemsByCharterUrlTemplateOverride.Trim();
+            string encoded = UnityWebRequest.EscapeURL(carId);
+            url = template.Replace("{charter_id}", encoded);
+        }
+        else
+        {
+            url = $"/inventory/items/?charter_id={UnityWebRequest.EscapeURL(carId)}";
+        }
+
         Debug.Log("[StorageRepository] GET " + url);
 
-        yield return GetProjectLocations(url, carId, onSuccess, onError);
+        yield return GetItemsForCar(url, carId, onSuccess, onError);
     }
 
     // -----------------------------
@@ -50,12 +95,14 @@ public class StorageRepository : MonoBehaviour
 
         if (req.result != UnityWebRequest.Result.Success)
         {
+            LastGetAllHadError = true;
             string body = req.downloadHandler != null ? req.downloadHandler.text : "";
             string msg = $"[StorageRepository] API falhou: {req.error} | HTTP={(int)req.responseCode} | Body={body}";
             Debug.LogWarning(msg);
 
             if (TryGetCachedRows(out var cachedRows))
             {
+                LastGetAllUsedCacheFallback = true;
                 Debug.LogWarning($"[StorageRepository] A usar cache local de items (rows={cachedRows.Count}).");
                 onSuccess?.Invoke(cachedRows);
                 yield break;
@@ -76,11 +123,13 @@ public class StorageRepository : MonoBehaviour
         }
         catch (Exception e)
         {
+            LastGetAllHadError = true;
             Debug.LogWarning("[StorageRepository] Erro a fazer parse do JSON (/items/): " + e.Message);
             Debug.LogWarning("JSON recebido: " + json);
 
             if (TryGetCachedRows(out var cachedRows))
             {
+                LastGetAllUsedCacheFallback = true;
                 Debug.LogWarning($"[StorageRepository] Parse falhou, a usar cache local (rows={cachedRows.Count}).");
                 rows = cachedRows;
             }
@@ -95,13 +144,13 @@ public class StorageRepository : MonoBehaviour
         onSuccess?.Invoke(rows);
     }
 
-    private IEnumerator GetProjectLocations(
+    private IEnumerator GetItemsForCar(
         string url,
-        string projectId,
+        string carId,
         Action<List<StorageRowDTO>> onSuccess,
         Action<string> onError)
     {
-        Debug.Log("[StorageRepository][GetProjectLocations][START] " + url + " projectId=" + projectId);
+        Debug.Log("[StorageRepository][GetItemsForCar][START] " + url + " carId=" + carId);
 
         using var req = UnityWebRequest.Get(url);
         req.SetRequestHeader("Accept", "application/json");
@@ -119,37 +168,51 @@ public class StorageRepository : MonoBehaviour
         }
 
         string json = req.downloadHandler.text;
-        Debug.Log($"[StorageRepository][GetProjectLocations][END] result={req.result} http={(int)req.responseCode}");
-        Debug.Log("[StorageRepository][GetProjectLocations][RESPONSE_JSON_RAW] " + json);
+        Debug.Log($"[StorageRepository][GetItemsForCar][END] result={req.result} http={(int)req.responseCode}");
+        Debug.Log("[StorageRepository][GetItemsForCar][RESPONSE_JSON_RAW] " + json);
 
         List<StorageRowDTO> rows;
         try
         {
-            rows = ParseRowsFromProjectLocationsJson(json, projectId);
+            rows = ParseRowsFromItemsJson(json, carId);
         }
         catch (Exception e)
         {
-            Debug.LogWarning("[StorageRepository] Erro a fazer parse do JSON (/projects/{id}/locations): " + e.Message);
+            Debug.LogWarning("[StorageRepository] Erro a fazer parse do JSON (/items/?charter_id=): " + e.Message);
             Debug.LogWarning("[StorageRepository] A continuar com rows vazias para não bloquear o fluxo.");
             Debug.LogWarning("JSON recebido: " + json);
             rows = new List<StorageRowDTO>();
         }
 
-        Debug.Log($"[StorageRepository] Parsed car locations rows = {rows.Count} (project_id={projectId})");
+        Debug.Log($"[StorageRepository] Parsed car item rows = {rows.Count} (carId={carId})");
         onSuccess?.Invoke(rows);
     }
 
-    private List<StorageRowDTO> ParseRowsFromItemsJson(string json)
+    private List<StorageRowDTO> ParseRowsFromItemsJson(string json, string fallbackCarId = null)
     {
         var rows = new List<StorageRowDTO>();
         int skipped = 0;
 
         foreach (var item in EnumeratePayloadArray(json, "items", "data", "results", "payload", "value"))
         {
-            string carId = ReadString(item, "project_id", "projectId", "carId", "car_id");
-            if (string.IsNullOrWhiteSpace(carId)) carId = "unknown";
+            string carId;
+            if (!string.IsNullOrWhiteSpace(fallbackCarId))
+            {
+                // Quando a lista já vem filtrada por charter_id, garantimos consistência
+                // para o match exato no HighlightCarBoxes(row.carId == carId).
+                carId = fallbackCarId;
+            }
+            else
+            {
+                carId = ReadString(item, "charter_id", "charterId", "project_id", "projectId", "carId", "car_id");
+                if (string.IsNullOrWhiteSpace(carId)) carId = "unknown";
+            }
             string itemId = ReadString(item, "id", "itemId", "item_id", "barcode", "name");
             if (string.IsNullOrWhiteSpace(itemId)) itemId = "unknown-item";
+            string itemName = ReadString(item, "name", "itemName", "title");
+            string itemState = ReadString(item, "state", "itemState", "status");
+            string itemDescription = ReadString(item, "description", "itemDescription");
+            string carModel = ReadString(item, "car_project_name", "car_model_location", "carModel", "car_model");
 
             bool mappedAny = false;
             foreach (var loc in EnumerateLocationTokens(item, includeItemAsFallback: false))
@@ -158,12 +221,18 @@ public class StorageRepository : MonoBehaviour
                 string shelf = ReadString(loc, "shelf", "shelfId", "shelf_id");
                 string area = ReadString(loc, "area", "areaId", "area_id");
 
+                NormalizeLocationIds(ref section, ref shelf, ref area);
+
                 if (string.IsNullOrWhiteSpace(section) || string.IsNullOrWhiteSpace(shelf) || string.IsNullOrWhiteSpace(area))
                     continue;
 
                 rows.Add(new StorageRowDTO
                 {
                     itemId = itemId,
+                    itemName = itemName,
+                    itemState = itemState,
+                    itemDescription = itemDescription,
+                    carModel = carModel,
                     carId = carId,
                     location = new StorageLocationDTO
                     {
@@ -183,46 +252,25 @@ public class StorageRepository : MonoBehaviour
         return rows;
     }
 
-    private List<StorageRowDTO> ParseRowsFromProjectLocationsJson(string json, string projectId)
+    private void NormalizeLocationIds(ref string section, ref string shelf, ref string area)
     {
-        var rows = new List<StorageRowDTO>();
-        int skipped = 0;
+        if (string.IsNullOrWhiteSpace(section) || string.IsNullOrWhiteSpace(shelf) || string.IsNullOrWhiteSpace(area))
+            return;
 
-        foreach (var item in EnumeratePayloadArray(json, "locations", "items", "data", "results", "payload", "value"))
+        string rawShelf = shelf;
+
+        // backend pode devolver shelf/area "curtos" (ex.: shelf=1, area=1)
+        // mas a cena usa ids compostos (ex.: shelf=3-1, area=3-1-1).
+        if (!shelf.Contains("-"))
+            shelf = $"{section}-{shelf}";
+
+        if (!area.Contains("-"))
         {
-            bool mappedAny = false;
-            string itemId = ReadString(item, "id", "itemId", "item_id", "barcode", "name");
-            if (string.IsNullOrWhiteSpace(itemId)) itemId = "unknown-item";
-            foreach (var loc in EnumerateLocationTokens(item, includeItemAsFallback: true))
-            {
-                string section = ReadString(loc, "section", "sectionId", "section_id");
-                string shelf = ReadString(loc, "shelf", "shelfId", "shelf_id");
-                string area = ReadString(loc, "area", "areaId", "area_id");
-
-                if (string.IsNullOrWhiteSpace(section) || string.IsNullOrWhiteSpace(shelf) || string.IsNullOrWhiteSpace(area))
-                    continue;
-
-                rows.Add(new StorageRowDTO
-                {
-                    itemId = itemId,
-                    carId = projectId,
-                    location = new StorageLocationDTO
-                    {
-                        section = section,
-                        shelf = shelf,
-                        area = area
-                    }
-                });
-
-                mappedAny = true;
-            }
-
-            if (!mappedAny)
-                skipped++;
+            string shelfSegment = !string.IsNullOrWhiteSpace(rawShelf)
+                ? rawShelf
+                : shelf;
+            area = $"{section}-{shelfSegment}-{area}";
         }
-
-        Debug.Log($"[StorageRepository][GetProjectLocations][MAP] mapped={rows.Count} skipped={skipped}");
-        return rows;
     }
 
     private IEnumerable<JToken> EnumeratePayloadArray(string json, params string[] envelopeKeys)
@@ -396,15 +444,6 @@ public class StorageRepository : MonoBehaviour
 
         public string created_at;
         public string updated_at;
-    }
-
-    // DTO do endpoint /projects/{id}/locations (exemplo do swagger)
-    [Serializable]
-    private class ProjectLocationDTO
-    {
-        public int id;
-        public string name;
-        public WarehouseLocationDTO warehouse_location;
     }
 
     [Serializable]

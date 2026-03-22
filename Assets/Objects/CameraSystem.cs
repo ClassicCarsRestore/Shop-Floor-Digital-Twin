@@ -31,6 +31,9 @@ namespace Objects
 
         private CinemachineVirtualCamera previousCam;
         private bool inWarehouseMode = false;
+        private Vector3 savedPreWarehousePos;
+        private Quaternion savedPreWarehouseRot;
+        private bool hasSavedPreWarehousePose = false;
 
         [SerializeField] private float FieldOfViewMin = 0;
         [SerializeField] private float FieldOfViewMax = 70;
@@ -319,8 +322,46 @@ namespace Objects
 
         public void EnterWarehouseFirstPerson()
         {
+            if (inWarehouseMode)
+            {
+                // Mesmo já em modo warehouse, forçar pose correta de entrada.
+                if (warehouseSpawnPoint != null)
+                {
+                    transform.SetPositionAndRotation(warehouseSpawnPoint.position, warehouseSpawnPoint.rotation);
+                    if (camWarehouseFP != null)
+                        camWarehouseFP.transform.SetPositionAndRotation(warehouseSpawnPoint.position, warehouseSpawnPoint.rotation);
+                }
+
+                if (camWarehouseFP != null)
+                {
+                    CameraSwitcher.switchCamera(camWarehouseFP);
+                    cam = camWarehouseFP;
+                }
+
+                return;
+            }
+
+            // guardar pose atual para restaurar ao sair da warehouse
+            savedPreWarehousePos = transform.position;
+            savedPreWarehouseRot = transform.rotation;
+            hasSavedPreWarehousePose = true;
+
+            // limpar estados transitórios que podem contaminar nova entrada
+            if (inTopPlacementMode)
+                ExitTopPlacementViewRestore();
+
+            inSectionFocus = false;
+            isTurning = false;
+            RestoreHiddenOccluders();
+            focusedSection = null;
+
             inWarehouseMode = true;
-            previousCam = cam;
+
+            // guardar câmara anterior real (nunca a própria câmara de warehouse)
+            if (cam != null && cam != camWarehouseFP)
+                previousCam = cam;
+            else if (cam1 != null)
+                previousCam = cam1;
 
             ActiveControls();
 
@@ -329,8 +370,10 @@ namespace Objects
 
             if (warehouseSpawnPoint != null)
             {
-                transform.position = warehouseSpawnPoint.position;
-                transform.rotation = warehouseSpawnPoint.rotation;
+                transform.SetPositionAndRotation(warehouseSpawnPoint.position, warehouseSpawnPoint.rotation);
+
+                if (camWarehouseFP != null)
+                    camWarehouseFP.transform.SetPositionAndRotation(warehouseSpawnPoint.position, warehouseSpawnPoint.rotation);
             }
 
             if (camWarehouseFP != null)
@@ -353,6 +396,19 @@ namespace Objects
             {
                 CameraSwitcher.switchCamera(previousCam);
                 cam = previousCam;
+            }
+            else if (cam1 != null)
+            {
+                CameraSwitcher.switchCamera(cam1);
+                cam = cam1;
+            }
+
+            if (hasSavedPreWarehousePose)
+            {
+                transform.SetPositionAndRotation(savedPreWarehousePos, savedPreWarehouseRot);
+
+                if (camWarehouseFP != null)
+                    camWarehouseFP.transform.SetPositionAndRotation(savedPreWarehousePos, savedPreWarehouseRot);
             }
         }
 

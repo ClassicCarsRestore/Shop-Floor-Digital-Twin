@@ -10,6 +10,8 @@ public class WarehouseSectionSelection : MonoBehaviour
 
     public ShelfSection Selected { get; private set; }
     public bool IsEditing => Selected != null;
+    public bool IsEditPanelVisible => warehouseEditPanel != null
+                                      && warehouseEditPanel.gameObject.activeInHierarchy;
 
     private Coroutine showRoutine;
 
@@ -22,6 +24,7 @@ public class WarehouseSectionSelection : MonoBehaviour
         if (placementController != null && placementController.IsPlacing)
             return;
 
+        WarehouseBoxDetailsPanel.Instance?.Hide();
         Selected = section;
 
         if (cameraSystem != null)
@@ -37,8 +40,8 @@ public class WarehouseSectionSelection : MonoBehaviour
 
     private IEnumerator ShowPanelNextFrame(ShelfSection section)
     {
-        yield return null; 
-        if (Selected != section) yield break; 
+        yield return null;
+        if (Selected != section) yield break;
 
         if (warehouseEditPanel != null)
             warehouseEditPanel.ShowFor(section);
@@ -53,6 +56,7 @@ public class WarehouseSectionSelection : MonoBehaviour
         }
 
         Selected = null;
+        WarehouseBoxDetailsPanel.Instance?.Hide();
 
         if (warehouseEditPanel != null)
             warehouseEditPanel.Hide();

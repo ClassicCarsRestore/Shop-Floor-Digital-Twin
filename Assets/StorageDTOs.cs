@@ -13,6 +13,10 @@ public class StorageLocationDTO
 public class StorageRowDTO
 {
     public string itemId;
+    public string itemName;
+    public string itemState;
+    public string itemDescription;
+    public string carModel;
     public string carId;
     public StorageLocationDTO location;
 }

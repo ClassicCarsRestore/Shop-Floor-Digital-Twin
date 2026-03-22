@@ -11,6 +11,12 @@ public class WarehouseManager : MonoBehaviour
     [Header("Prefabs")]
     public GameObject storageBoxPrefab;
 
+    [Header("Selection/Details")]
+    [SerializeField] private WarehouseSectionSelection sectionSelection;
+    [SerializeField] private WarehouseBoxDetailsPanel boxDetailsPanelInScene;
+    [SerializeField] private WarehouseBoxDetailsPanel boxDetailsPanelPrefab;
+    [SerializeField] private Transform boxDetailsPanelParent;
+
     // Guarda caixas instanciadas por localiza��o (sec-shelf-area)
     private readonly Dictionary<string, StorageBox> boxesByLocation = new Dictionary<string, StorageBox>();
 
@@ -24,11 +30,21 @@ public class WarehouseManager : MonoBehaviour
             return;
         }
         Instance = this;
+
+        EnsureBoxDetailsPanelInstance();
+
+        SetWarehouseRootVisible(false);
     }
 
     // ---------------------------
     // PUBLIC API
     // ---------------------------
+
+    public void SetWarehouseRootVisible(bool isVisible)
+    {
+        if (WarehouseRoot == null) return;
+        WarehouseRoot.gameObject.SetActive(isVisible);
+    }
 
     /// <summary>
     /// Mostra TODAS as caixas do armaz�m (todas as locations) sem highlight.
@@ -38,6 +54,7 @@ public class WarehouseManager : MonoBehaviour
     {
         ClearAllBoxes();
         ResetAllAreasToFree();
+        HideBoxDetailsPanel();
 
         if (rows == null) return;
 
@@ -45,7 +62,7 @@ public class WarehouseManager : MonoBehaviour
         {
             if (row == null || row.location == null) continue;
 
-            SpawnBoxAt(row.itemId, row.carId, row.location, highlight: false);
+            SpawnBoxAt(row.itemId, row.carId, row.location, highlight: false, row);
         }
     }
 
@@ -110,6 +127,7 @@ public class WarehouseManager : MonoBehaviour
     {
         // Limpa caixas antigas desse carro (se houver)
         ClearBoxesForCar(carId);
+        HideBoxDetailsPanel();
 
         if (locations == null) return;
 
@@ -119,6 +137,47 @@ public class WarehouseManager : MonoBehaviour
 
             SpawnBoxAt(null, carId, loc, highlight: true);
         }
+    }
+
+    public bool TryHandleStorageBoxClick(StorageBox box)
+    {
+        if (box == null)
+            return false;
+
+        if (sectionSelection == null || !sectionSelection.IsEditing || !sectionSelection.IsEditPanelVisible)
+            return false;
+
+        var selected = sectionSelection.Selected;
+        if (selected == null)
+            return false;
+
+        string clickedSectionId = box.GetSectionId();
+        if (string.IsNullOrWhiteSpace(clickedSectionId))
+            return false;
+
+        if (!string.Equals(selected.SectionId, clickedSectionId, System.StringComparison.Ordinal))
+            return false;
+
+        var panel = EnsureBoxDetailsPanelInstance();
+        if (panel == null)
+        {
+            Debug.LogWarning("[WarehouseManager] WarehouseBoxDetailsPanel não existe na cena e nenhum prefab foi atribuído.");
+            return false;
+        }
+
+        panel.Show(box);
+        return true;
+    }
+
+    public bool TryHandleStorageAreaClick(StorageArea area)
+    {
+        if (area == null)
+            return false;
+
+        if (!boxesByLocation.TryGetValue(area.AreaId, out var box) || box == null)
+            return false;
+
+        return TryHandleStorageBoxClick(box);
     }
 
     public ShelfSection AddSectionRuntime(GameObject sectionGO)
@@ -191,7 +250,7 @@ public class WarehouseManager : MonoBehaviour
     // INTERNALS
     // ---------------------------
 
-    private void SpawnBoxAt(string itemId, string carId, StorageLocationDTO loc, bool highlight)
+    private void SpawnBoxAt(string itemId, string carId, StorageLocationDTO loc, bool highlight, StorageRowDTO rowData = null)
     {
         var area = FindArea(loc.section, loc.shelf, loc.area);
         if (area == null)
@@ -222,8 +281,7 @@ public class WarehouseManager : MonoBehaviour
         var boxComp = boxGO.GetComponent<StorageBox>();
         if (boxComp != null)
         {
-            boxComp.CarId = carId;
-            boxComp.LocationKey = key;
+            boxComp.ApplyData(rowData, itemId, carId, key);
             boxComp.Highlight(highlight);
 
             // garantir tamanho/posição corretos no slot
@@ -293,6 +351,8 @@ public class WarehouseManager : MonoBehaviour
     /// </summary>
     public void ClearAllBoxes()
     {
+        HideBoxDetailsPanel();
+
         foreach (var kv in boxesByLocation)
         {
             if (kv.Value != null)
@@ -333,6 +393,52 @@ public class WarehouseManager : MonoBehaviour
                 }
             }
         }
+    }
+
+    private void HideBoxDetailsPanel()
+    {
+        var panel = EnsureBoxDetailsPanelInstance();
+        if (panel != null)
+            panel.Hide();
+    }
+
+    private WarehouseBoxDetailsPanel EnsureBoxDetailsPanelInstance()
+    {
+        if (boxDetailsPanelInScene != null)
+            return boxDetailsPanelInScene;
+
+        if (WarehouseBoxDetailsPanel.Instance != null)
+        {
+            boxDetailsPanelInScene = WarehouseBoxDetailsPanel.Instance;
+            return boxDetailsPanelInScene;
+        }
+
+        var existing = FindFirstObjectByType<WarehouseBoxDetailsPanel>(FindObjectsInactive.Include);
+        if (existing != null)
+        {
+            boxDetailsPanelInScene = existing;
+            return boxDetailsPanelInScene;
+        }
+
+        if (boxDetailsPanelPrefab == null)
+            return null;
+
+        Transform parent = boxDetailsPanelParent;
+        if (parent == null)
+        {
+            var canvas = FindFirstObjectByType<Canvas>(FindObjectsInactive.Include);
+            if (canvas != null)
+                parent = canvas.transform;
+        }
+
+        WarehouseBoxDetailsPanel instance;
+        if (parent != null)
+            instance = Instantiate(boxDetailsPanelPrefab, parent, false);
+        else
+            instance = Instantiate(boxDetailsPanelPrefab);
+
+        boxDetailsPanelInScene = instance;
+        return boxDetailsPanelInScene;
     }
 
 

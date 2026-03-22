@@ -15,6 +15,11 @@ public class EnergyTrendMonthlyBarBinder : MonoBehaviour
     [Header("Config")]
     [SerializeField] private int lastMonths = 5;
 
+    [Header("Axis")]
+    [SerializeField] private bool useFixedYAxisRange = false;
+    [SerializeField] private float fixedYAxisMin = 0f;
+    [SerializeField] private float fixedYAxisMax = 45000f;
+
     [Header("Refresh")]
     [SerializeField] private float refreshSeconds = 60f;
     [SerializeField] private bool autoRefresh = true;
@@ -73,13 +78,17 @@ public class EnergyTrendMonthlyBarBinder : MonoBehaviour
 
         chartData.title = p.title;
         chartData.subtitle = p.subtitle;
+        chartData.xAxisTitle = "Month";
+        chartData.yAxisTitle = "kWh / month";
+
+        ApplyAxisRange();
 
         // X categories (labels dos meses)
         if (chartData.categoriesX == null) chartData.categoriesX = new List<string>();
         chartData.categoriesX.Clear();
         for (int i = 0; i < n; i++) chartData.categoriesX.Add(p.categories[i]);
 
-        // 1 série para bar chart (kWh)
+        // 1 sï¿½rie para bar chart (kWh)
         if (chartData.series == null) chartData.series = new List<E2ChartData.Series>();
         chartData.series.Clear();
 
@@ -91,7 +100,7 @@ public class EnergyTrendMonthlyBarBinder : MonoBehaviour
             dataShow = new List<bool>(n),
             dataY = new List<float>(n),
 
-            // listas não usadas aqui mas o E2 pede existirem
+            // listas nï¿½o usadas aqui mas o E2 pede existirem
             dataX = new List<float>(n),
             dataZ = new List<float>(n),
             dateTimeTick = new List<long>(n),
@@ -113,5 +122,26 @@ public class EnergyTrendMonthlyBarBinder : MonoBehaviour
 
         chartData.hasChanged = true;
         chart.UpdateChart();
+    }
+
+    private void ApplyAxisRange()
+    {
+        if (chart == null || chart.chartOptions == null || chart.chartOptions.yAxis == null)
+            return;
+
+        var yAxis = chart.chartOptions.yAxis;
+        if (useFixedYAxisRange)
+        {
+            yAxis.autoAxisRange = false;
+            yAxis.min = fixedYAxisMin;
+            yAxis.max = Mathf.Max(fixedYAxisMin + 0.001f, fixedYAxisMax);
+        }
+        else
+        {
+            yAxis.autoAxisRange = true;
+            yAxis.startFromZero = true;
+        }
+
+        chart.chartOptions.hasChanged = true;
     }
 }

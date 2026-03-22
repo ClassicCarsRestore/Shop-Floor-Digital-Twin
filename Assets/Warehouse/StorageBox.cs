@@ -1,9 +1,17 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 public class StorageBox : MonoBehaviour
 {
     [Header("Car Info")]
     public string CarId;
+
+    [Header("Item Info")]
+    public string ItemId;
+    public string ItemName;
+    public string ItemState;
+    public string ItemDescription;
+    public string CarModel;
 
     [Header("Location Key (section-shelf-area)")]
     public string LocationKey;
@@ -14,6 +22,7 @@ public class StorageBox : MonoBehaviour
     [Header("Fit")]
     [SerializeField, Range(0.1f, 1f)] private float padding = 0.98f;
     [SerializeField] private bool autoFit = true;
+    [SerializeField] private bool blockClickWhenPointerOverUI = false;
 
     private Vector3 baseLocalScale;
     private bool hasBaseScale;
@@ -42,6 +51,42 @@ public class StorageBox : MonoBehaviour
     {
         if (boxRenderer == null || !hasOriginal) return;
         boxRenderer.material.color = on ? Color.yellow : originalColor;
+    }
+
+    public void ApplyData(StorageRowDTO row, string fallbackItemId, string fallbackCarId, string locationKey)
+    {
+        ItemId = !string.IsNullOrWhiteSpace(row?.itemId) ? row.itemId : fallbackItemId;
+        ItemName = row?.itemName;
+        ItemState = row?.itemState;
+        ItemDescription = row?.itemDescription;
+        CarModel = row?.carModel;
+        CarId = !string.IsNullOrWhiteSpace(row?.carId) ? row.carId : fallbackCarId;
+        LocationKey = locationKey;
+    }
+
+    public string GetSectionId()
+    {
+        string source = !string.IsNullOrWhiteSpace(LocationKey) ? LocationKey : null;
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            var area = GetComponentInParent<StorageArea>();
+            source = area != null ? area.AreaId : null;
+        }
+
+        if (string.IsNullOrWhiteSpace(source))
+            return null;
+
+        int idx = source.IndexOf('-');
+        return idx > 0 ? source.Substring(0, idx) : source;
+    }
+
+    private void OnMouseDown()
+    {
+        if (blockClickWhenPointerOverUI && EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            return;
+
+        if (WarehouseManager.Instance != null)
+            WarehouseManager.Instance.TryHandleStorageBoxClick(this);
     }
 
     private void OnTransformParentChanged()

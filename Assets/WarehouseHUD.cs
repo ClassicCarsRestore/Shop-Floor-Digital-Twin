@@ -13,11 +13,13 @@ public class WarehouseHUD : MonoBehaviour
     [SerializeField] private UIManager uiManager;
     [SerializeField] private WarehouseSectionInteractor sectionInteractor;
     [SerializeField] private WarehouseSectionSelection selection;
+    [SerializeField] private WarehouseViewController warehouseViewController;
 
     [Header("Layout Save/Cancel")]
     [SerializeField] private WarehouseLayoutController layoutController;
     [SerializeField] private Button saveToBdButton;
     [SerializeField] private Button cancelAllButton;
+    [SerializeField] private Button refreshItemsButton;
 
     [Header("Unsaved Changes Dialog")]
     [SerializeField] private GameObject unsavedChangesDialog;
@@ -39,6 +41,8 @@ public class WarehouseHUD : MonoBehaviour
             saveToBdButton.onClick.AddListener(OnSaveToBD);
         if (cancelAllButton != null)
             cancelAllButton.onClick.AddListener(OnCancelAll);
+        if (refreshItemsButton != null)
+            refreshItemsButton.onClick.AddListener(OnRefreshItems);
 
         if (unsavedChangesDialog != null)
             unsavedChangesDialog.SetActive(false);
@@ -54,6 +58,9 @@ public class WarehouseHUD : MonoBehaviour
     {
         uiManager.InteractableOff();
         gameObject.SetActive(true);
+
+        if (refreshItemsButton != null)
+            refreshItemsButton.interactable = true;
 
         SetMainHudButtonsVisible(true);
 
@@ -103,6 +110,9 @@ public class WarehouseHUD : MonoBehaviour
         if (cameraSystem != null)
             cameraSystem.ExitWarehouseFirstPerson();
 
+        if (WarehouseManager.Instance != null)
+            WarehouseManager.Instance.SetWarehouseRootVisible(false);
+
         Hide();
     }
 
@@ -118,13 +128,35 @@ public class WarehouseHUD : MonoBehaviour
             layoutController.OnClickCancelAll();
     }
 
+    private void OnRefreshItems()
+    {
+        if (warehouseViewController == null)
+        {
+            Debug.LogWarning("[WarehouseHUD] WarehouseViewController não atribuído para refresh.");
+            return;
+        }
+
+        if (refreshItemsButton != null)
+            refreshItemsButton.interactable = false;
+
+        bool started = warehouseViewController.TryRefreshAllStorage(() =>
+        {
+            if (refreshItemsButton != null)
+                refreshItemsButton.interactable = true;
+        });
+
+        if (!started && refreshItemsButton != null)
+            refreshItemsButton.interactable = true;
+    }
+
     public void SetMainHudButtonsVisible(bool visible)
     {
         if (exitButton != null) exitButton.gameObject.SetActive(visible);
         if (saveToBdButton != null) saveToBdButton.gameObject.SetActive(visible);
         if (cancelAllButton != null) cancelAllButton.gameObject.SetActive(visible);
+        if (refreshItemsButton != null) refreshItemsButton.gameObject.SetActive(visible);
 
-       
+
     }
 
 }

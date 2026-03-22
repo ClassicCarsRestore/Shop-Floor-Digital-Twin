@@ -150,7 +150,6 @@ public class ShelfSectionShelvesController : MonoBehaviour
             section.Shelves.Add(sh);
         }
 
-        Debug.Log($"[ShelfSectionShelvesController] Rebuild ok. Shelves={section.Shelves.Count}");
     }
 
     public void RebuildShelves() => RebuildShelvesFromHierarchy();

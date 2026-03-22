@@ -1,7 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
+using System;
 using UnityEngine;
 using Objects;
+using UI;
 
 public class WarehouseViewController : MonoBehaviour
 {
@@ -10,12 +12,51 @@ public class WarehouseViewController : MonoBehaviour
     [SerializeField] private StorageRepository storageRepository;
     [SerializeField] private WarehouseLayoutController layoutController;
     [SerializeField] private Roof roof;
+    [SerializeField] private UIManager uiManager;
 
     private List<StorageRowDTO> lastAllRows = new List<StorageRowDTO>();
+    private bool isRefreshingAllStorage;
+
+    public bool TryRefreshAllStorage(Action onCompleted = null)
+    {
+        if (isRefreshingAllStorage)
+            return false;
+
+        if (storageRepository == null)
+        {
+            Debug.LogWarning("[WarehouseViewController] StorageRepository não atribuído para refresh.");
+            onCompleted?.Invoke();
+            return false;
+        }
+
+        StartCoroutine(RefreshAllStorageRoutine(onCompleted));
+        return true;
+    }
+
+    private IEnumerator RefreshAllStorageRoutine(Action onCompleted)
+    {
+        isRefreshingAllStorage = true;
+
+        yield return StartCoroutine(storageRepository.GetAllStorage(
+            onSuccess: (rows) =>
+            {
+                lastAllRows = rows ?? new List<StorageRowDTO>();
+                if (WarehouseManager.Instance != null)
+                    WarehouseManager.Instance.ShowAllStorage(lastAllRows);
+            },
+            onError: (err) => Debug.LogWarning("[WarehouseViewController] Refresh GetAllStorage error: " + err)
+        ));
+
+        isRefreshingAllStorage = false;
+        onCompleted?.Invoke();
+    }
 
     public void OpenWarehouseAll()
     {
         if (roof != null) roof.EnsureFirstFloorOn();
+
+        if (WarehouseManager.Instance != null)
+            WarehouseManager.Instance.SetWarehouseRootVisible(true);
 
         cameraSystem.EnterWarehouseFirstPerson();
         WarehouseHUD.Instance.Show();
@@ -56,6 +97,15 @@ public class WarehouseViewController : MonoBehaviour
             Debug.LogWarning("[WarehouseViewController] carId vazio");
             return;
         }
+
+        if (uiManager != null)
+        {
+            // Entrada pela ficha de projeto: fechar/deselecionar Projects.
+            uiManager.CloseProjects();
+        }
+
+        if (WarehouseManager.Instance != null)
+            WarehouseManager.Instance.SetWarehouseRootVisible(true);
 
         cameraSystem.EnterWarehouseFirstPerson();
         WarehouseHUD.Instance.Show();

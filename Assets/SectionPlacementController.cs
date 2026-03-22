@@ -100,40 +100,6 @@ public class SectionPlacementController : MonoBehaviour
 
     // buffer p/ evitar GC
     private Collider[] overlapBuffer = new Collider[64];
-    [SerializeField] private bool debugOverlaps = true;
-
-    private void DebugOverlapAtCurrent()
-    {
-        if (!debugOverlaps || ghostCollider == null) return;
-
-        LayerMask mask = wallsMask | collisionMask;
-
-        Vector3 center = ghostCollider.transform.TransformPoint(ghostCollider.center);
-        Quaternion rot = ghostCollider.transform.rotation;
-        Vector3 halfExtents =
-     Vector3.Scale(AbsVec3(ghostCollider.size) * 0.5f,
-                   AbsVec3(ghostCollider.transform.lossyScale));
-
-        halfExtents = AbsVec3(halfExtents); // “cinto e suspensórios”
-        halfExtents += Vector3.one * overlapPadding;
-
-
-
-        Collider[] hits = Physics.OverlapBox(center, halfExtents, rot, mask, QueryTriggerInteraction.Ignore);
-
-        Debug.Log($"[Overlap] hits={hits.Length} at center={center} halfExt={halfExtents}");
-
-        Debug.Log($"size={ghostCollider.size} lossy={ghostCollider.transform.lossyScale}");
-
-
-        foreach (var h in hits)
-        {
-            if (h == null) continue;
-            if (h.transform.IsChildOf(ghostInstance.transform)) continue;
-
-            Debug.Log($"  -> {h.name} | layer={LayerMask.LayerToName(h.gameObject.layer)} | enabled={h.enabled} | bounds={h.bounds}");
-        }
-    }
 
     private static Vector3 AbsVec3(Vector3 v)
     {
@@ -170,9 +136,6 @@ public class SectionPlacementController : MonoBehaviour
 
         HandleRotationInput();
         UpdateGhostTransformDrag_NoTeleport_WithAxisSlide();
-        if (Input.GetMouseButton(0))
-            DebugOverlapAtCurrent();
-
 
         ValidateGhost();
         UpdateGhostVisual();

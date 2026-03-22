@@ -16,6 +16,9 @@ public class HeatmapZoneChartBinder : MonoBehaviour
     [SerializeField] private bool hideZeroZones = false;
     [SerializeField] private int maxZones = 0; // 0 = all
 
+    private readonly Dictionary<string, int> barIndexByLocationId = new Dictionary<string, int>();
+    private string selectedLocationId;
+
     private void OnEnable()
     {
         if (heatmapController == null)
@@ -24,6 +27,7 @@ public class HeatmapZoneChartBinder : MonoBehaviour
         if (heatmapController != null)
         {
             heatmapController.OnHeatmapChartUpdated += HandleHeatmapChartUpdated;
+            heatmapController.OnHeatmapZoneClicked += HandleHeatmapZoneClicked;
 
             if (heatmapController.TryGetLastChartPayload(out var payload))
                 HandleHeatmapChartUpdated(payload);
@@ -33,7 +37,10 @@ public class HeatmapZoneChartBinder : MonoBehaviour
     private void OnDisable()
     {
         if (heatmapController != null)
+        {
             heatmapController.OnHeatmapChartUpdated -= HandleHeatmapChartUpdated;
+            heatmapController.OnHeatmapZoneClicked -= HandleHeatmapZoneClicked;
+        }
     }
 
     private void HandleHeatmapChartUpdated(HeatmapModeController.HeatmapChartPayload payload)
@@ -42,6 +49,72 @@ public class HeatmapZoneChartBinder : MonoBehaviour
             return;
 
         ApplyPayload(payload);
+
+        if (barIndexByLocationId.Count == 0)
+        {
+            selectedLocationId = null;
+            return;
+        }
+
+        ApplySelectedHighlight();
+    }
+
+    private void HandleHeatmapZoneClicked(string locationId)
+    {
+        selectedLocationId = locationId;
+        ApplySelectedHighlight();
+    }
+
+    private void ApplySelectedHighlight()
+    {
+        if (!CanApplyHighlight())
+            return;
+
+        if (string.IsNullOrWhiteSpace(selectedLocationId))
+        {
+            TrySetHighlight(-1, -1);
+            return;
+        }
+
+        if (barIndexByLocationId.TryGetValue(selectedLocationId, out int barIndex))
+            TrySetHighlight(0, barIndex);
+        else
+            TrySetHighlight(-1, -1);
+    }
+
+    private bool CanApplyHighlight()
+    {
+        if (!IsReady())
+            return false;
+
+        if (!isActiveAndEnabled || !gameObject.activeInHierarchy)
+            return false;
+
+        if (chart.gameObject == null || !chart.gameObject.activeInHierarchy)
+            return false;
+
+        if (chartData.series == null || chartData.series.Count == 0)
+            return false;
+
+        var firstSeries = chartData.series[0];
+        if (firstSeries == null || firstSeries.dataY == null || firstSeries.dataY.Count == 0)
+            return false;
+
+        return true;
+    }
+
+    private void TrySetHighlight(int seriesIndex, int dataIndex)
+    {
+        if (!CanApplyHighlight())
+            return;
+
+        try
+        {
+            chart.SetHighlight(seriesIndex, dataIndex);
+        }
+        catch (System.NullReferenceException)
+        {
+        }
     }
 
     private bool IsReady()
@@ -91,6 +164,8 @@ public class HeatmapZoneChartBinder : MonoBehaviour
         if (chartData.categoriesX == null) chartData.categoriesX = new List<string>();
         chartData.categoriesX.Clear();
 
+        barIndexByLocationId.Clear();
+
         if (chartData.series == null) chartData.series = new List<E2ChartData.Series>();
         chartData.series.Clear();
 
@@ -121,6 +196,9 @@ public class HeatmapZoneChartBinder : MonoBehaviour
             series.dataZ.Add(0f);
             series.dateTimeTick.Add(0);
             series.dateTimeString.Add("");
+
+            if (!string.IsNullOrWhiteSpace(p.locationId))
+                barIndexByLocationId[p.locationId] = i;
         }
 
         chartData.series.Add(series);

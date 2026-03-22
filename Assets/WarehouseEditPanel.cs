@@ -16,7 +16,7 @@ public class WarehouseEditPanel : MonoBehaviour
     private ShelfSectionShelvesController shelvesController;
 
 
-    
+
     [SerializeField] private WarehouseSectionSelection selection;
     [SerializeField] private CameraSystem cameraSystem;
 
@@ -24,17 +24,17 @@ public class WarehouseEditPanel : MonoBehaviour
 
     private void Awake()
     {
-        
+
 
         if (deleteButton != null) deleteButton.onClick.AddListener(DeleteSelected);
         if (moveButton != null) moveButton.onClick.AddListener(EditPlacement);
 
-       
+
         if (addShelfButton != null) addShelfButton.onClick.AddListener(AddShelf);
         if (removeShelfButton != null) removeShelfButton.onClick.AddListener(RemoveShelf);
         if (remodelShelfButton != null) remodelShelfButton.onClick.AddListener(RemodelSection);
         if (exitSectionButton != null) exitSectionButton.onClick.AddListener(DeselectAndClose);
-        
+
         if (placementController != null)
         {
             placementController.OnEditPlacementStarted += HandleEditPlacementStarted;
@@ -70,6 +70,7 @@ public class WarehouseEditPanel : MonoBehaviour
         current = section;
         gameObject.SetActive(true);
         SetEditButtonsInteractable(true);
+        WarehouseBoxDetailsPanel.Instance?.Hide();
 
         WarehouseHUD.Instance?.EnterEditMode();
 
@@ -79,6 +80,7 @@ public class WarehouseEditPanel : MonoBehaviour
     {
         current = null;
         gameObject.SetActive(false);
+        WarehouseBoxDetailsPanel.Instance?.Hide();
 
         WarehouseHUD.Instance?.ExitEditMode();
     }
@@ -95,13 +97,14 @@ public class WarehouseEditPanel : MonoBehaviour
     private void DeleteSelected()
     {
         if (current == null) return;
+        WarehouseBoxDetailsPanel.Instance?.Hide();
 
         if (WarehouseManager.Instance != null)
             WarehouseManager.Instance.Sections.Remove(current);
 
         Destroy(current.gameObject);
 
-        // depois de apagar, limpa seleção (reativa movement e fecha painel)
+        // depois de apagar, limpa seleï¿½ï¿½o (reativa movement e fecha painel)
         if (selection != null) selection.ClearSelection();
         else Hide();
 
@@ -111,7 +114,9 @@ public class WarehouseEditPanel : MonoBehaviour
 
     private void DeselectAndClose()
     {
-        // restaurar pose da câmara
+        WarehouseBoxDetailsPanel.Instance?.Hide();
+
+        // restaurar pose da cï¿½mara
         if (cameraSystem != null)
             cameraSystem.RestoreAfterSectionFocus();
 
@@ -126,11 +131,12 @@ public class WarehouseEditPanel : MonoBehaviour
     private void EditPlacement()
     {
         if (current == null) return;
+        WarehouseBoxDetailsPanel.Instance?.Hide();
 
-        // desativa botões de edição imediatamente 
+        // desativa botï¿½es de ediï¿½ï¿½o imediatamente 
         SetEditButtonsInteractable(false);
 
-        // ao começar move placement: controls ON
+        // ao comeï¿½ar move placement: controls ON
         if (cameraSystem != null)
             cameraSystem.ActiveControls();
 
@@ -141,11 +147,12 @@ public class WarehouseEditPanel : MonoBehaviour
     private void AddShelf()
     {
         if (current == null) return;
+        WarehouseBoxDetailsPanel.Instance?.Hide();
 
         var ctrl = current.GetComponent<ShelfSectionShelvesController>();
         if (ctrl == null)
         {
-            Debug.LogWarning("[WarehouseEditPanel] Esta section não tem ShelfSectionShelvesController.");
+            Debug.LogWarning("[WarehouseEditPanel] Esta section nï¿½o tem ShelfSectionShelvesController.");
             return;
         }
 
@@ -155,11 +162,12 @@ public class WarehouseEditPanel : MonoBehaviour
     private void RemoveShelf()
     {
         if (current == null) return;
+        WarehouseBoxDetailsPanel.Instance?.Hide();
 
         var ctrl = current.GetComponent<ShelfSectionShelvesController>();
         if (ctrl == null)
         {
-            Debug.LogWarning("[WarehouseEditPanel] Esta section não tem ShelfSectionShelvesController.");
+            Debug.LogWarning("[WarehouseEditPanel] Esta section nï¿½o tem ShelfSectionShelvesController.");
             return;
         }
 
@@ -171,8 +179,9 @@ public class WarehouseEditPanel : MonoBehaviour
     private void RemodelSection()
     {
         if (current == null) return;
+        WarehouseBoxDetailsPanel.Instance?.Hide();
 
-       
+
         SetEditButtonsInteractable(false);
 
         if (remodelController != null)
@@ -185,10 +194,12 @@ public class WarehouseEditPanel : MonoBehaviour
     // ----------------------------
     private void HandleEditPlacementStarted(ShelfSection section)
     {
-        // só reage se for a section atualmente selecionada
+        // sï¿½ reage se for a section atualmente selecionada
         if (current != section) return;
 
-        
+        WarehouseBoxDetailsPanel.Instance?.Hide();
+
+
         gameObject.SetActive(false);
 
         WarehouseHUD.Instance?.EnterEditMode();
@@ -211,7 +222,7 @@ public class WarehouseEditPanel : MonoBehaviour
         }
     }
 
-  
+
 
 
 
@@ -224,7 +235,9 @@ public class WarehouseEditPanel : MonoBehaviour
     {
         if (current != section) return;
 
-        // esconder botões do edit enquanto remodel está aberto
+        WarehouseBoxDetailsPanel.Instance?.Hide();
+
+        // esconder botï¿½es do edit enquanto remodel estï¿½ aberto
         gameObject.SetActive(false);
 
         WarehouseHUD.Instance?.EnterEditMode();
@@ -235,7 +248,7 @@ public class WarehouseEditPanel : MonoBehaviour
         if (current != section) return;
 
         WarehouseHUD.Instance?.EnterEditMode();
-        // voltar ao modo normal de edição: section continua selecionada
+        // voltar ao modo normal de ediï¿½ï¿½o: section continua selecionada
         if (selection != null)
         {
             selection.SelectSection(section); // foca camera + mostra edit panel + controls OFF

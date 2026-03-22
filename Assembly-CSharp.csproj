@@ -121,6 +121,7 @@
     <Compile Include="Assets\ColorPicker\Scripts\ColorPicker.cs" />
     <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Core\E2ChartEvents.cs" />
     <Compile Include="Assets\Warehouse\ShelfSection.cs" />
+    <Compile Include="Assets\Warehouse\WarehouseBenchmarkRunner.cs" />
     <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Core\Builder\E2ChartBuilderAreaChart.cs" />
     <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Core\Builder\E2ChartGridAxis.cs" />
     <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Core\Handler\E2ChartZoomControl.cs" />
@@ -188,8 +189,10 @@
     <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Core\Graphic\E2ChartGraphicRadarChartShade.cs" />
     <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Core\Handler\E2ChartCombinerPreviewHandler.cs" />
     <Compile Include="Assets\ColorPicker\Scripts\InputHex.cs" />
+    <Compile Include="Assets\HeatmapSyntheticDataProvider.cs" />
     <Compile Include="Assets\Warehouse\StorageBox.cs" />
     <Compile Include="Assets\UI\Login.cs" />
+    <Compile Include="Assets\Warehouse\WarehouseBoxDetailsPanel.cs" />
     <Compile Include="Assets\Ice Pond\E2Chart\Scripts\Core\Builder\E2ChartGrid.cs" />
     <Compile Include="Assets\SectionRemodelController.cs" />
     <Compile Include="Assets\Objects\ColorPickerLocation.cs" />

@@ -4,8 +4,12 @@ using Objects;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Text;
 using UI;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using E2C;
 
@@ -34,6 +38,7 @@ public class HeatmapModeController : MonoBehaviour
     }
 
     public event Action<HeatmapChartPayload> OnHeatmapChartUpdated;
+    public event Action<string> OnHeatmapZoneClicked;
 
     [SerializeField] private bool debugLogHeatmap = true;
 
@@ -48,6 +53,15 @@ public class HeatmapModeController : MonoBehaviour
 
     [Header("Chart UI (Optional)")]
     [SerializeField] private GameObject heatmapChartUiPrefab;
+
+    [Header("Synthetic Data (Runtime tests)")]
+    [SerializeField] private HeatmapSyntheticDataProvider syntheticDataProvider;
+    [SerializeField] private bool enableSyntheticHotkeys = true;
+
+    [Header("Synthetic Campaign (One-shot)")]
+    [SerializeField] private bool includeBenchmarkInCampaign = true;
+    [SerializeField] private int[] campaignDateWindowsDays = new[] { 7, 30, 90 };
+    [SerializeField] private string campaignReportFileName = "heatmap-campaign-last.txt";
 
     private APIscript api;
     private readonly Dictionary<string, GameObject> zoneGo = new();
@@ -94,6 +108,8 @@ public class HeatmapModeController : MonoBehaviour
     private bool mappingsPrepared = false;
 
     private HeatmapChartPayload lastChartPayload;
+    private bool syntheticCampaignRunning = false;
+    private string lastSyntheticCampaignReport = string.Empty;
 
     private static readonly int PROP_COLOR = Shader.PropertyToID("_Color");
     private static readonly int PROP_BASE_COLOR = Shader.PropertyToID("_BaseColor");
@@ -115,6 +131,25 @@ public class HeatmapModeController : MonoBehaviour
         if (isInHeatmapMode)
         {
             HandleHoverTooltip();
+            HandleZoneClick();
+
+            if (enableSyntheticHotkeys && syntheticDataProvider != null)
+            {
+                if (Input.GetKeyUp(KeyCode.F5))
+                    StartCoroutine(RegenerateSyntheticAndRecompute());
+
+                if (Input.GetKeyUp(KeyCode.F6))
+                    StartCoroutine(CycleSyntheticScenarioAndRecompute());
+
+                if (Input.GetKeyUp(KeyCode.F7))
+                    StartCoroutine(RunSyntheticScalabilityBenchmark());
+
+                if (Input.GetKeyUp(KeyCode.F8))
+                    StartCoroutine(RunFullSyntheticCampaign());
+
+                if (Input.GetKeyUp(KeyCode.F9))
+                    PrintLastSyntheticCampaignReport();
+            }
         }
     }
 
@@ -330,6 +365,16 @@ public class HeatmapModeController : MonoBehaviour
             mappingsPrepared = false;
         }
 
+        if (syntheticDataProvider != null && syntheticDataProvider.ForceSyntheticData)
+        {
+            bool shouldRegenerate = syntheticDataProvider.RegenerateEachRequest || !syntheticDataProvider.HasInjectedSynthetic;
+            if (shouldRegenerate)
+            {
+                yield return syntheticDataProvider.InjectIntoApi(api, api.locations);
+                mappingsPrepared = false;
+            }
+        }
+
         if (api.activities == null || api.activities.Count == 0)
         {
             var tHist0 = api.GetActivityAndLocationHistoryAsync();
@@ -350,6 +395,16 @@ public class HeatmapModeController : MonoBehaviour
             var tTasks0 = api.GetTasksAsync();
             while (!tTasks0.IsCompleted) yield return null;
             mappingsPrepared = false;
+        }
+
+        if (syntheticDataProvider != null)
+        {
+            bool backendMissing = (api.activities == null || api.activities.Count == 0 || api.tasks == null || api.tasks.Count == 0);
+            if (syntheticDataProvider.ShouldInject(api, backendMissing))
+            {
+                yield return syntheticDataProvider.InjectIntoApi(api, api.locations);
+                mappingsPrepared = false;
+            }
         }
 
         var allTasks = api.tasks;
@@ -567,6 +622,322 @@ public class HeatmapModeController : MonoBehaviour
                 Debug.Log($"[Heatmap] {loc.name} => {metricInfo} -> norm={tNorm:0.###} curve={tCurve:0.###}");
             }
         }
+    }
+
+    private IEnumerator RegenerateSyntheticAndRecompute()
+    {
+        if (syntheticDataProvider == null)
+            yield break;
+
+        if (api == null) api = FindObjectOfType<APIscript>(true);
+        if (api == null)
+            yield break;
+
+        if (api.locations == null || api.locations.Count == 0)
+        {
+            var tLoc = api.GetVirtualMapLocationsAsync();
+            while (!tLoc.IsCompleted) yield return null;
+            mappingsPrepared = false;
+        }
+
+        yield return syntheticDataProvider.InjectIntoApi(api, api.locations);
+        mappingsPrepared = false;
+
+        if (currentFrom.HasValue && currentTo.HasValue)
+            yield return ComputeAndApplyHeatmap(currentFrom.Value, currentTo.Value, currentMetric);
+    }
+
+    private IEnumerator CycleSyntheticScenarioAndRecompute()
+    {
+        if (syntheticDataProvider == null)
+            yield break;
+
+        var next = syntheticDataProvider.CycleScenario();
+        Debug.Log($"[HeatmapSynthetic] Cenário ativo: {next}");
+
+        yield return RegenerateSyntheticAndRecompute();
+    }
+
+    private IEnumerator RunSyntheticScalabilityBenchmark()
+    {
+        yield return RunSyntheticScalabilityBenchmarkInternal(logToConsole: true, outputLines: null);
+    }
+
+    private IEnumerator RunSyntheticScalabilityBenchmarkInternal(bool logToConsole, List<string> outputLines)
+    {
+        if (syntheticDataProvider == null)
+            yield break;
+
+        if (api == null) api = FindObjectOfType<APIscript>(true);
+        if (api == null)
+            yield break;
+
+        if (api.locations == null || api.locations.Count == 0)
+        {
+            var tLoc = api.GetVirtualMapLocationsAsync();
+            while (!tLoc.IsCompleted) yield return null;
+            mappingsPrepared = false;
+        }
+
+        if (!currentFrom.HasValue || !currentTo.HasValue)
+            yield break;
+
+        var sizes = syntheticDataProvider.BenchmarkEventCounts;
+        if (sizes == null || sizes.Count == 0)
+            yield break;
+
+        if (logToConsole)
+            Debug.Log("[HeatmapSynthetic][Benchmark] Início benchmark de escalabilidade.");
+
+        foreach (var size in sizes)
+        {
+            float t0 = Time.realtimeSinceStartup;
+
+            yield return syntheticDataProvider.InjectIntoApi(api, api.locations, overrideTotalEvents: size);
+            mappingsPrepared = false;
+
+            float tIngestion = (Time.realtimeSinceStartup - t0) * 1000f;
+
+            float t1 = Time.realtimeSinceStartup;
+            yield return ComputeAndApplyHeatmap(currentFrom.Value, currentTo.Value, currentMetric);
+            float tCompute = (Time.realtimeSinceStartup - t1) * 1000f;
+
+            float t2 = Time.realtimeSinceStartup;
+            yield return new WaitForEndOfFrame();
+            float tRender = (Time.realtimeSinceStartup - t2) * 1000f;
+
+            string line = string.Format(
+                CultureInfo.InvariantCulture,
+                "[HeatmapSynthetic][Benchmark] events={0} | ingestionMs={1:0.##} | computeMs={2:0.##} | renderFrameMs={3:0.##}",
+                size,
+                tIngestion,
+                tCompute,
+                tRender);
+
+            if (logToConsole)
+                Debug.Log(line);
+
+            outputLines?.Add(line);
+            yield return null;
+        }
+
+        if (logToConsole)
+            Debug.Log("[HeatmapSynthetic][Benchmark] Fim benchmark.");
+    }
+
+    private IEnumerator RunFullSyntheticCampaign()
+    {
+        if (syntheticCampaignRunning)
+        {
+            Debug.LogWarning("[HeatmapSynthetic][Campaign] Já existe uma campanha em execução.");
+            yield break;
+        }
+
+        if (syntheticDataProvider == null)
+        {
+            Debug.LogWarning("[HeatmapSynthetic][Campaign] syntheticDataProvider não configurado.");
+            yield break;
+        }
+
+        syntheticCampaignRunning = true;
+        Debug.Log("[HeatmapSynthetic][Campaign] Início campanha completa (F8).");
+
+        var originalMetric = currentMetric;
+        var originalFrom = currentFrom;
+        var originalTo = currentTo;
+
+        var report = new StringBuilder(4096);
+        report.AppendLine("# Heatmap Synthetic Campaign Report");
+        report.AppendLine($"GeneratedAtUtc: {DateTime.UtcNow:O}");
+        report.AppendLine($"WindowsDays: {string.Join(",", campaignDateWindowsDays ?? Array.Empty<int>())}");
+        report.AppendLine($"IncludeBenchmark: {includeBenchmarkInCampaign}");
+        report.AppendLine();
+
+        bool shouldRestoreHeatmap = false;
+
+        try
+        {
+            if (api == null) api = FindObjectOfType<APIscript>(true);
+            if (api == null)
+            {
+                report.AppendLine("ERROR|APIscript not found");
+                yield break;
+            }
+
+            if (api.locations == null || api.locations.Count == 0)
+            {
+                var tLoc = api.GetVirtualMapLocationsAsync();
+                while (!tLoc.IsCompleted) yield return null;
+                mappingsPrepared = false;
+            }
+
+            if (api.locations == null || api.locations.Count == 0)
+            {
+                report.AppendLine("ERROR|No locations available for campaign");
+                yield break;
+            }
+
+            var scenarios = new[]
+            {
+                HeatmapSyntheticScenario.Uniform,
+                HeatmapSyntheticScenario.Skewed,
+                HeatmapSyntheticScenario.MetricDifferentiation
+            };
+
+            var metrics = new[] { HeatmapMetric.Frequency, HeatmapMetric.Occupancy };
+            var windows = (campaignDateWindowsDays == null || campaignDateWindowsDays.Length == 0)
+                ? new[] { 7, 30, 90 }
+                : campaignDateWindowsDays;
+
+            foreach (var scenario in scenarios)
+            {
+                syntheticDataProvider.SetScenario(scenario);
+
+                float tInject0 = Time.realtimeSinceStartup;
+                yield return syntheticDataProvider.InjectIntoApi(api, api.locations, overrideTotalEvents: null, overrideScenario: scenario);
+                float injectMs = (Time.realtimeSinceStartup - tInject0) * 1000f;
+                mappingsPrepared = false;
+
+                report.AppendLine($"SCENARIO|name={scenario}|injectMs={injectMs.ToString("0.##", CultureInfo.InvariantCulture)}");
+
+                if (!string.IsNullOrEmpty(syntheticDataProvider.LastGroundTruthSummaryLine))
+                    report.AppendLine(syntheticDataProvider.LastGroundTruthSummaryLine);
+                if (!string.IsNullOrEmpty(syntheticDataProvider.LastGroundTruthTopFrequencyLine))
+                    report.AppendLine(syntheticDataProvider.LastGroundTruthTopFrequencyLine);
+                if (!string.IsNullOrEmpty(syntheticDataProvider.LastGroundTruthTopOccupancyLine))
+                    report.AppendLine(syntheticDataProvider.LastGroundTruthTopOccupancyLine);
+
+                foreach (var days in windows)
+                {
+                    int safeDays = Mathf.Max(1, days);
+                    var to = DateTime.UtcNow;
+                    var from = to.AddDays(-safeDays);
+
+                    currentFrom = from;
+                    currentTo = to;
+
+                    foreach (var metric in metrics)
+                    {
+                        currentMetric = metric;
+
+                        float t0 = Time.realtimeSinceStartup;
+                        yield return ComputeAndApplyHeatmap(from, to, metric);
+                        float computeMs = (Time.realtimeSinceStartup - t0) * 1000f;
+
+                        if (TryGetLastChartPayload(out var payload) && payload != null)
+                        {
+                            string top3 = BuildTop3FromPayload(payload);
+                            report.AppendLine(string.Format(
+                                CultureInfo.InvariantCulture,
+                                "RESULT|scenario={0}|windowDays={1}|metric={2}|from={3:yyyy-MM-dd}|to={4:yyyy-MM-dd}|total={5:0.##}|max={6:0.##}|computeMs={7:0.##}|top3={8}",
+                                scenario,
+                                safeDays,
+                                metric,
+                                from,
+                                to,
+                                payload.total,
+                                payload.max,
+                                computeMs,
+                                top3));
+                        }
+                        else
+                        {
+                            report.AppendLine($"RESULT|scenario={scenario}|windowDays={safeDays}|metric={metric}|status=NO_PAYLOAD");
+                        }
+
+                        yield return null;
+                    }
+                }
+
+                if (includeBenchmarkInCampaign)
+                {
+                    currentFrom = DateTime.UtcNow.AddDays(-30);
+                    currentTo = DateTime.UtcNow;
+                    currentMetric = HeatmapMetric.Frequency;
+
+                    var benchLines = new List<string>();
+                    yield return RunSyntheticScalabilityBenchmarkInternal(logToConsole: false, outputLines: benchLines);
+                    for (int i = 0; i < benchLines.Count; i++)
+                        report.AppendLine($"BENCH|scenario={scenario}|{benchLines[i]}");
+                }
+
+                report.AppendLine();
+            }
+        }
+        finally
+        {
+            currentMetric = originalMetric;
+            currentFrom = originalFrom;
+            currentTo = originalTo;
+
+            shouldRestoreHeatmap = originalFrom.HasValue && originalTo.HasValue;
+
+            syntheticCampaignRunning = false;
+        }
+
+        if (shouldRestoreHeatmap)
+            yield return ComputeAndApplyHeatmap(originalFrom.Value, originalTo.Value, originalMetric);
+
+        lastSyntheticCampaignReport = report.ToString();
+        SaveSyntheticCampaignReport(lastSyntheticCampaignReport);
+
+        Debug.Log("[HeatmapSynthetic][Campaign][FINAL_REPORT_BEGIN]\n" + lastSyntheticCampaignReport + "\n[HeatmapSynthetic][Campaign][FINAL_REPORT_END]");
+        Debug.Log("[HeatmapSynthetic][Campaign] Fim campanha completa.");
+    }
+
+    private static string BuildTop3FromPayload(HeatmapChartPayload payload)
+    {
+        if (payload == null || payload.points == null || payload.points.Count == 0 || payload.total <= 0f)
+            return "n/a";
+
+        var ordered = new List<HeatmapZonePoint>(payload.points);
+        ordered.Sort((a, b) => b.value.CompareTo(a.value));
+
+        int take = Mathf.Min(3, ordered.Count);
+        var parts = new List<string>(take);
+
+        for (int i = 0; i < take; i++)
+        {
+            var p = ordered[i];
+            string zone = string.IsNullOrWhiteSpace(p.zoneName) ? p.locationId : p.zoneName;
+            parts.Add($"{zone}={p.percent * 100f:0.00}%");
+        }
+
+        return string.Join(" | ", parts);
+    }
+
+    private void SaveSyntheticCampaignReport(string reportText)
+    {
+        try
+        {
+            string fileName = string.IsNullOrWhiteSpace(campaignReportFileName)
+                ? "heatmap-campaign-last.txt"
+                : campaignReportFileName.Trim();
+
+            string repoRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            string docsDir = Path.Combine(repoRoot, "docs");
+            Directory.CreateDirectory(docsDir);
+
+            string fullPath = Path.Combine(docsDir, fileName);
+            File.WriteAllText(fullPath, reportText ?? string.Empty, Encoding.UTF8);
+
+            Debug.Log($"[HeatmapSynthetic][Campaign] Relatório guardado em: {fullPath}");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[HeatmapSynthetic][Campaign] Falha ao guardar relatório: " + ex.Message);
+        }
+    }
+
+    private void PrintLastSyntheticCampaignReport()
+    {
+        if (string.IsNullOrWhiteSpace(lastSyntheticCampaignReport))
+        {
+            Debug.Log("[HeatmapSynthetic][Campaign] Ainda não existe relatório em memória. Corre F8 primeiro.");
+            return;
+        }
+
+        Debug.Log("[HeatmapSynthetic][Campaign][LAST_REPORT_BEGIN]\n" + lastSyntheticCampaignReport + "\n[HeatmapSynthetic][Campaign][LAST_REPORT_END]");
     }
 
     private void PrepareStaticMappings(List<TaskDTO> allTasks)
@@ -1115,6 +1486,28 @@ public class HeatmapModeController : MonoBehaviour
 
         currentTooltipLocId = null;
         tooltipInstance.Hide();
+    }
+
+    private void HandleZoneClick()
+    {
+        if (!Input.GetMouseButtonDown(0))
+            return;
+
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            return;
+
+        Camera cam = Camera.main;
+        if (cam == null) return;
+
+        Ray ray = cam.ScreenPointToRay(Input.mousePosition);
+        if (!Physics.Raycast(ray, out RaycastHit hit))
+            return;
+
+        var tag = hit.collider.GetComponentInParent<HeatmapZoneTag>();
+        if (tag == null || string.IsNullOrEmpty(tag.locationId))
+            return;
+
+        OnHeatmapZoneClicked?.Invoke(tag.locationId);
     }
 }
 
