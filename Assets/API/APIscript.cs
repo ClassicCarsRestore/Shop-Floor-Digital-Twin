@@ -19,9 +19,9 @@ namespace API
 
 
         //teste unity
-        //private const string apiUrl = "https://charterturinmonitor.raimundobranco.com/api";
+        private const string apiUrl = "https://charterturinmonitor.raimundobranco.com/api";
 
-        private const string apiUrl = "/api";
+        //private const string apiUrl = "/api";
         private string role;
         private string securityToken;
         public string lastCarLocation;
