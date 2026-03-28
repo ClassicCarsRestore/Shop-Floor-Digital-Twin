@@ -49,8 +49,6 @@ public static class WarehouseLayoutSerializer
                         areas = new List<AreaLayoutDTO>()
                     };
 
-                    // Se não tens status/itemId no Unity (ainda), manda defaults.
-                    // Se tiveres esses campos no StorageArea, troca aqui para mapear.
                     if (shelf.Areas != null)
                     {
                         for (int a = 0; a < shelf.Areas.Count; a++)
@@ -61,7 +59,7 @@ public static class WarehouseLayoutSerializer
                             shelfDto.areas.Add(new AreaLayoutDTO
                             {
                                 areaId = ar.AreaId,      // "sec-shelfIndex-areaIndex"
-                                index = a + 1,           // índice 1..N
+                                index = a + 1,
                                 status = string.IsNullOrEmpty(ar.Status) ? "free" : ar.Status,
                                 itemId = string.IsNullOrEmpty(ar.ItemId) ? null : ar.ItemId
                             });
@@ -163,12 +161,6 @@ public static class WarehouseLayoutSerializer
 
                     ShelfAreasBuilder.RebuildAreas(shelf, areaCount, sec.SectionId, shelfIndex);
 
-                    // (Opcional mas recomendado)
-                    // Se quiseres aplicar status/itemId às StorageArea criadas,
-                    // precisas que StorageArea tenha esses campos. Ex:
-                    // area.Status = ...
-                    // area.ItemId = ...
-                    // (Se ainda não tens isso no componente, ignora este bloco.)
                     if (shelfDto.areas != null && shelf.Areas != null)
                     {
                         for (int a = 0; a < shelf.Areas.Count && a < shelfDto.areas.Count; a++)
@@ -177,10 +169,8 @@ public static class WarehouseLayoutSerializer
                             var areaDto = shelfDto.areas[a];
                             if (areaComp == null || areaDto == null) continue;
 
-                            // Garante AreaId exatamente igual ao DTO (mesmo que o builder já o faça)
                             areaComp.AreaId = areaDto.areaId;
 
-                            // Se adicionares estes campos ao StorageArea no futuro:
                             areaComp.Status = areaDto.status;
                             areaComp.ItemId = areaDto.itemId;
                             areaComp.UpdateVisual();
@@ -188,7 +178,7 @@ public static class WarehouseLayoutSerializer
                     }
                 }
 
-                shelvesCtrl?.RebuildShelves(); // ids finais consistentes
+                shelvesCtrl?.RebuildShelves();
             }
         }
 

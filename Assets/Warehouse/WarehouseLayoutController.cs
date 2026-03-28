@@ -84,8 +84,6 @@ public class WarehouseLayoutController : MonoBehaviour
     /// </summary>
     public void LoadLayoutAndThen(Action onDone)
     {
-        Debug.Log("[WarehouseLayoutController][LOAD][REQUESTED]");
-
         if (layoutRepository == null || warehouseManager == null)
         {
             Debug.LogWarning("[WarehouseLayoutController] layoutRepository ou warehouseManager não atribuídos.");
@@ -99,7 +97,6 @@ public class WarehouseLayoutController : MonoBehaviour
 
     private IEnumerator DoLoadLayoutAndThen(Action onDone)
     {
-        Debug.Log("[WarehouseLayoutController][LOAD][START]");
         isLoadingLayout = true;
 
         bool done = false;
@@ -131,21 +128,17 @@ public class WarehouseLayoutController : MonoBehaviour
                 if (cachedLayout.sections == null)
                     cachedLayout.sections = new System.Collections.Generic.List<SectionLayoutDTO>();
 
-                Debug.Log($"[WarehouseLayoutController][LOAD][FALLBACK_CACHE] sections={cachedLayout.sections.Count}");
-
                 if (sectionPrefabForLayout != null)
                     WarehouseLayoutSerializer.ApplyLayout(cachedLayout, warehouseManager, sectionPrefabForLayout);
 
                 lastLoadedLayout = WarehouseLayoutSerializer.BuildFromRuntime(warehouseManager);
                 lastLoadedLayoutJson = JsonConvert.SerializeObject(lastLoadedLayout, Formatting.None);
-                Debug.Log("[WarehouseLayoutController][LOAD][END_WITH_ERROR_USING_CACHE]");
             }
             else
             {
                 // Se não houver cache, mantém estado atual para evitar limpar a cena.
                 lastLoadedLayout = WarehouseLayoutSerializer.BuildFromRuntime(warehouseManager);
                 lastLoadedLayoutJson = JsonConvert.SerializeObject(lastLoadedLayout, Formatting.None);
-                Debug.Log("[WarehouseLayoutController][LOAD][END_WITH_ERROR_NO_CACHE] snapshot mantido do runtime atual");
             }
         }
         else
@@ -154,15 +147,11 @@ public class WarehouseLayoutController : MonoBehaviour
             if (safeLoaded.sections == null)
                 safeLoaded.sections = new System.Collections.Generic.List<SectionLayoutDTO>();
 
-            Debug.Log($"[WarehouseLayoutController][LOAD][DTO] sections={safeLoaded.sections.Count}");
-
             if (sectionPrefabForLayout != null)
                 WarehouseLayoutSerializer.ApplyLayout(safeLoaded, warehouseManager, sectionPrefabForLayout);
 
             lastLoadedLayout = WarehouseLayoutSerializer.BuildFromRuntime(warehouseManager);
             lastLoadedLayoutJson = JsonConvert.SerializeObject(lastLoadedLayout, Formatting.None);
-            int finalSections = (lastLoadedLayout != null && lastLoadedLayout.sections != null) ? lastLoadedLayout.sections.Count : 0;
-            Debug.Log($"[WarehouseLayoutController][LOAD][END_OK] sections_aplicadas={finalSections}");
         }
 
         isLoadingLayout = false;
@@ -173,11 +162,8 @@ public class WarehouseLayoutController : MonoBehaviour
 
     public void OnClickSaveToBD()
     {
-        Debug.Log("[WarehouseLayoutController][PUT][REQUESTED]");
-
         if (!HasUnsavedChanges())
         {
-            Debug.Log("[WarehouseLayoutController][PUT] Sem alterações por guardar. Save ignorado.");
             RefreshActionButtons();
             return;
         }
@@ -208,14 +194,11 @@ public class WarehouseLayoutController : MonoBehaviour
 
         if (storageRepository != null)
         {
-            Debug.Log("[WarehouseLayoutController][PUT][PRE_SYNC_ITEMS][START]");
-
             yield return StartCoroutine(storageRepository.GetAllStorage(
                 onSuccess: rows =>
                 {
                     var safeRows = rows ?? new System.Collections.Generic.List<StorageRowDTO>();
                     warehouseManager.ShowAllStorage(safeRows);
-                    Debug.Log($"[WarehouseLayoutController][PUT][PRE_SYNC_ITEMS][OK] rows={safeRows.Count}");
                     refreshDone = true;
                 },
                 onError: err =>
@@ -244,9 +227,6 @@ public class WarehouseLayoutController : MonoBehaviour
         }
 
         var currentLayout = WarehouseLayoutSerializer.BuildFromRuntime(warehouseManager);
-        int sectionCount = currentLayout != null && currentLayout.sections != null ? currentLayout.sections.Count : 0;
-        Debug.Log($"[WarehouseLayoutController][PUT][BUILD] sections={sectionCount}");
-
         bool saveDone = false;
 
         yield return StartCoroutine(layoutRepository.SaveLayout(
@@ -299,7 +279,6 @@ public class WarehouseLayoutController : MonoBehaviour
 
         if (!HasUnsavedChanges())
         {
-            Debug.Log("[WarehouseLayoutController] Sem alterações por guardar. Cancel All ignorado.");
             RefreshActionButtons();
             return;
         }
@@ -323,13 +302,10 @@ public class WarehouseLayoutController : MonoBehaviour
 
         if (storageRepository != null)
         {
-            Debug.Log("[WarehouseLayoutController][CANCEL][PRESERVE_BOXES][FETCH_ROWS_START]");
-
             yield return StartCoroutine(storageRepository.GetAllStorage(
                 onSuccess: rows =>
                 {
                     rowsSnapshot = rows ?? new System.Collections.Generic.List<StorageRowDTO>();
-                    Debug.Log($"[WarehouseLayoutController][CANCEL][PRESERVE_BOXES][FETCH_ROWS_OK] rows={rowsSnapshot.Count}");
                     storageDone = true;
                 },
                 onError: err =>
@@ -355,7 +331,6 @@ public class WarehouseLayoutController : MonoBehaviour
         if (rowsSnapshot != null)
         {
             warehouseManager.ShowAllStorage(rowsSnapshot);
-            Debug.Log($"[WarehouseLayoutController][CANCEL][PRESERVE_BOXES][REAPPLY_OK] rows={rowsSnapshot.Count}");
         }
 
         isCancellingLayout = false;

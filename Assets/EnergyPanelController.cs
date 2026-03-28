@@ -39,9 +39,6 @@ public class EnergyPanelController : MonoBehaviour
     [SerializeField] private float cachePowerTimeseriesSeconds = 10f;
     [SerializeField] private float cacheEnergyDaySeriesSeconds = 120f;
 
-    [Header("Debug")]
-    [SerializeField] private bool debugEnergyEndpointLogs = false;
-
     [Serializable]
     public class EnergyDaySeriesResponse
     {
@@ -87,9 +84,6 @@ public class EnergyPanelController : MonoBehaviour
     }
 
     private readonly Dictionary<string, FrontendCacheEntry> frontendCache = new Dictionary<string, FrontendCacheEntry>();
-
-    private BreakdownMonthResponse lastBreakdownMonth;
-    private EnergyTrendMonthsResponse lastTrendMonths;
 
     [Serializable]
     public class MetricPanelUI
@@ -554,7 +548,6 @@ public class EnergyPanelController : MonoBehaviour
             data =>
             {
                 if (data == null) { ApplyErrorState(); return; }
-                LogOverviewIfEnabled(data);
                 ApplyToUI(data);
                 OverviewUpdated?.Invoke(data);
             },
@@ -579,10 +572,6 @@ public class EnergyPanelController : MonoBehaviour
                     onError?.Invoke("Empty response");
                     return;
                 }
-
-                lastBreakdownMonth = data;
-                LogBreakdownIfEnabled(data);
-                LogCrossEndpointConsistencyIfEnabled();
 
                 SetFrontendCache("breakdown_month", data, cacheBreakdownMonthSeconds);
                 onSuccess?.Invoke(data);
@@ -660,10 +649,6 @@ public class EnergyPanelController : MonoBehaviour
                 yield break;
             }
 
-            lastTrendMonths = data;
-            LogTrendMonthsIfEnabled(data);
-            LogCrossEndpointConsistencyIfEnabled();
-
             int n = Mathf.Min(data.labels.Length, data.values.Length);
             if (n <= 0)
             {
@@ -674,7 +659,7 @@ public class EnergyPanelController : MonoBehaviour
             var payload = new EnergyTrendPayload
             {
                 title = "Energy Consumption Monthly Trend",
-                subtitle = "", // opcional: podes p�r "�ltimos 5 meses"
+                subtitle = "",
                 unit = data.unit ?? "kWh",
                 categories = new System.Collections.Generic.List<string>(n),
                 values = new System.Collections.Generic.List<float>(n),
@@ -1308,136 +1293,6 @@ public class EnergyPanelController : MonoBehaviour
     private string BuildUrl(string path)
     {
         return apiBaseUrl.TrimEnd('/') + path;
-    }
-
-    private void LogOverviewIfEnabled(OverviewResponse data)
-    {
-        if (!debugEnergyEndpointLogs || data == null || data.total == null)
-            return;
-
-        float rightMonth = 0f;
-        float leftMonth = 0f;
-        float sandMonth = 0f;
-
-        if (data.meters != null)
-        {
-            for (int i = 0; i < data.meters.Length; i++)
-            {
-                var meter = data.meters[i];
-                if (meter == null) continue;
-
-                if (meter.id == ID_RIGHT) rightMonth = Mathf.Max(0f, meter.month_energy_kwh);
-                else if (meter.id == ID_LEFT) leftMonth = Mathf.Max(0f, meter.month_energy_kwh);
-                else if (meter.id == ID_SAND) sandMonth = Mathf.Max(0f, meter.month_energy_kwh);
-            }
-        }
-
-        Debug.Log(
-            "[EnergyDebug][Overview] " +
-            $"generated_at={data.generated_at}, total_current_w={data.total.current_power_w:0.###}, total_month_kwh={Mathf.Max(0f, data.total.month_energy_kwh):0.###}, " +
-            $"right_month_kwh={rightMonth:0.###}, left_month_kwh={leftMonth:0.###}, sand_month_kwh={sandMonth:0.###}"
-        );
-    }
-
-    private void LogBreakdownIfEnabled(BreakdownMonthResponse data)
-    {
-        if (!debugEnergyEndpointLogs || data == null)
-            return;
-
-        int n = Mathf.Min(
-            data.labels != null ? data.labels.Count : 0,
-            data.values != null ? data.values.Count : 0
-        );
-
-        float sum = 0f;
-        var parts = new List<string>(n);
-        for (int i = 0; i < n; i++)
-        {
-            float v = Mathf.Max(0f, data.values[i]);
-            sum += v;
-            parts.Add($"{data.labels[i]}={v:0.###}");
-        }
-
-        Debug.Log(
-            "[EnergyDebug][BreakdownMonth] " +
-            $"period={data.period}, unit={data.unit}, api_total_kwh={Mathf.Max(0f, data.total_kwh):0.###}, computed_sum_kwh={sum:0.###}, items=[{string.Join(" | ", parts)}]"
-        );
-    }
-
-    private void LogTrendMonthsIfEnabled(EnergyTrendMonthsResponse data)
-    {
-        if (!debugEnergyEndpointLogs || data == null || data.labels == null || data.values == null)
-            return;
-
-        int n = Mathf.Min(data.labels.Length, data.values.Length);
-        var parts = new List<string>(n);
-        for (int i = 0; i < n; i++)
-            parts.Add($"{data.labels[i]}={Mathf.Max(0f, data.values[i]):0.###}");
-
-        Debug.Log(
-            "[EnergyDebug][TrendMonths] " +
-            $"months={data.months}, unit={data.unit}, points=[{string.Join(" | ", parts)}]"
-        );
-    }
-
-    private void LogCrossEndpointConsistencyIfEnabled()
-    {
-        if (!debugEnergyEndpointLogs || lastBreakdownMonth == null || lastTrendMonths == null)
-            return;
-
-        string period = lastBreakdownMonth.period;
-        if (string.IsNullOrWhiteSpace(period) || period.Length < 7)
-            return;
-
-        string yearMonth = period.Substring(0, 7); // yyyy-MM
-        float breakdownTotal = Mathf.Max(0f, lastBreakdownMonth.total_kwh);
-
-        int n = Mathf.Min(lastTrendMonths.labels != null ? lastTrendMonths.labels.Length : 0, lastTrendMonths.values != null ? lastTrendMonths.values.Length : 0);
-        float? trendValue = null;
-
-        for (int i = 0; i < n; i++)
-        {
-            if (TryExtractYearMonth(lastTrendMonths.labels[i], out string ym) && ym == yearMonth)
-            {
-                trendValue = Mathf.Max(0f, lastTrendMonths.values[i]);
-                break;
-            }
-        }
-
-        if (!trendValue.HasValue)
-        {
-            Debug.Log($"[EnergyDebug][Consistency] breakdown_period={period} not found in trend labels.");
-            return;
-        }
-
-        float diff = trendValue.Value - breakdownTotal;
-        float abs = Mathf.Abs(diff);
-        float pct = breakdownTotal > 0.0001f ? (abs / breakdownTotal) * 100f : 0f;
-
-        Debug.Log(
-            "[EnergyDebug][Consistency] " +
-            $"month={yearMonth}, trend_value={trendValue.Value:0.###}, breakdown_total={breakdownTotal:0.###}, " +
-            $"abs_diff={abs:0.###}, pct_diff={pct:0.##}%, trend_unit={lastTrendMonths.unit}, breakdown_unit={lastBreakdownMonth.unit}"
-        );
-    }
-
-    private bool TryExtractYearMonth(string label, out string yearMonth)
-    {
-        yearMonth = null;
-        if (string.IsNullOrWhiteSpace(label))
-            return false;
-
-        DateTime parsed;
-        if (DateTime.TryParse(label, CultureInfo.CurrentCulture, DateTimeStyles.AllowWhiteSpaces, out parsed)
-            || DateTime.TryParse(label, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out parsed)
-            || DateTime.TryParse(label, new CultureInfo("pt-PT"), DateTimeStyles.AllowWhiteSpaces, out parsed)
-            || DateTime.TryParse(label, new CultureInfo("en-US"), DateTimeStyles.AllowWhiteSpaces, out parsed))
-        {
-            yearMonth = parsed.ToString("yyyy-MM");
-            return true;
-        }
-
-        return false;
     }
 
     // ----------- UI apply -----------

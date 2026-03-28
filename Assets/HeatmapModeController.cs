@@ -57,6 +57,7 @@ public class HeatmapModeController : MonoBehaviour
     [Header("Synthetic Data (Runtime tests)")]
     [SerializeField] private HeatmapSyntheticDataProvider syntheticDataProvider;
     [SerializeField] private bool enableSyntheticHotkeys = true;
+    [SerializeField] private bool enableSyntheticRuntime = false;
 
     [Header("Synthetic Campaign (One-shot)")]
     [SerializeField] private bool includeBenchmarkInCampaign = true;
@@ -133,7 +134,7 @@ public class HeatmapModeController : MonoBehaviour
             HandleHoverTooltip();
             HandleZoneClick();
 
-            if (enableSyntheticHotkeys && syntheticDataProvider != null)
+            if (enableSyntheticRuntime && enableSyntheticHotkeys && syntheticDataProvider != null)
             {
                 if (Input.GetKeyUp(KeyCode.F5))
                     StartCoroutine(RegenerateSyntheticAndRecompute());
@@ -270,7 +271,7 @@ public class HeatmapModeController : MonoBehaviour
             }
         }
 
-        var canvas = FindObjectOfType<Canvas>(true);
+        var canvas = ResolveHeatmapCanvas();
         if (canvas == null)
         {
             Debug.LogError("[Heatmap] Canvas não encontrado na cena.");
@@ -365,7 +366,7 @@ public class HeatmapModeController : MonoBehaviour
             mappingsPrepared = false;
         }
 
-        if (syntheticDataProvider != null && syntheticDataProvider.ForceSyntheticData)
+        if (enableSyntheticRuntime && syntheticDataProvider != null && syntheticDataProvider.ForceSyntheticData)
         {
             bool shouldRegenerate = syntheticDataProvider.RegenerateEachRequest || !syntheticDataProvider.HasInjectedSynthetic;
             if (shouldRegenerate)
@@ -397,7 +398,7 @@ public class HeatmapModeController : MonoBehaviour
             mappingsPrepared = false;
         }
 
-        if (syntheticDataProvider != null)
+        if (enableSyntheticRuntime && syntheticDataProvider != null)
         {
             bool backendMissing = (api.activities == null || api.activities.Count == 0 || api.tasks == null || api.tasks.Count == 0);
             if (syntheticDataProvider.ShouldInject(api, backendMissing))
@@ -425,26 +426,20 @@ public class HeatmapModeController : MonoBehaviour
             Debug.Log($"[Heatmap][DEBUG] Filtro datas => {filtroInicio:yyyy-MM-dd HH:mm} .. {filtroFim:yyyy-MM-dd HH:mm}");
 
         var valuesByZone = new Dictionary<string, double>();
-        int entradasContadas = 0;
 
         foreach (var carHist in histories)
         {
-            var carId = carHist?.CaseInstanceId ?? "(sem caseInstanceId)";
             if (carHist?.History == null) continue;
 
             foreach (var entry in carHist.History)
             {
                 if (entry == null || string.IsNullOrEmpty(entry.ActivityId))
                 {
-                    if (debugLogHeatmap)
-                        Debug.Log($"[Heatmap][DEBUG] Car {carId} entry.Id={entry?.Id} sem ActivityId, ignorar.");
                     continue;
                 }
 
                 if (!taskById.TryGetValue(entry.ActivityId, out var task) || task == null)
                 {
-                    if (debugLogHeatmap)
-                        Debug.Log($"[Heatmap][DEBUG] Car {carId} entry.Id={entry.Id} ActivityId={entry.ActivityId} sem Task correspondente, ignorar.");
                     continue;
                 }
 
@@ -472,8 +467,6 @@ public class HeatmapModeController : MonoBehaviour
 
                 if (!conta)
                 {
-                    if (debugLogHeatmap)
-                        Debug.Log($"[Heatmap][DEBUG] Task '{task.id}' actId='{task.activityId}' | entry.Id={entry.Id} car='{carId}' fora do intervalo, ignorar. Start={start} End={end}");
                     continue;
                 }
 
@@ -491,8 +484,6 @@ public class HeatmapModeController : MonoBehaviour
                 }
                 else
                 {
-                    if (debugLogHeatmap)
-                        Debug.Log($"[Heatmap][DEBUG] Task '{task.id}' actId='{task.activityId}' | entry.Id={entry.Id} car='{carId}' sem LocationId e sem mapeamento activityIds, ignorar.");
                     continue;
                 }
 
@@ -500,19 +491,9 @@ public class HeatmapModeController : MonoBehaviour
                 {
                     var atual = valuesByZone.GetValueOrDefault(locId);
                     valuesByZone[locId] = atual + valor;
-                    entradasContadas++;
-
-                    if (debugLogHeatmap)
-                    {
-                        locationNameById.TryGetValue(locId, out var locName);
-                        Debug.Log($"[Heatmap][DEBUG][{metric}] +{valor} em {locName ?? locId} ({locId}) -> total agora = {valuesByZone[locId]}");
-                    }
                 }
             }
         }
-
-        if (debugLogHeatmap)
-            Debug.Log($"[Heatmap][DEBUG] Entradas efectivamente contadas = {entradasContadas}");
 
         double totalVal = 0;
         double maxVal = 0;
@@ -1414,6 +1395,34 @@ public class HeatmapModeController : MonoBehaviour
             cameraSystem.SwitchToTopCam();
     }
 
+    private Canvas ResolveHeatmapCanvas()
+    {
+        var launcher = FindObjectOfType<HeatmapButtonLauncher>(true);
+        if (launcher != null)
+        {
+            var launcherCanvas = launcher.GetComponentInParent<Canvas>();
+            if (launcherCanvas != null)
+                return launcherCanvas;
+        }
+
+        var taggedUi = GameObject.FindGameObjectWithTag("TAG");
+        if (taggedUi != null)
+        {
+            var taggedCanvas = taggedUi.GetComponent<Canvas>();
+            if (taggedCanvas != null)
+                return taggedCanvas;
+        }
+
+        if (uiManager != null)
+        {
+            var uiCanvas = uiManager.GetComponentInParent<Canvas>();
+            if (uiCanvas != null)
+                return uiCanvas;
+        }
+
+        return FindObjectOfType<Canvas>(true);
+    }
+
     public bool TryGetTooltipText(string locationId, out string title, out string body)
     {
         title = "";
@@ -1438,13 +1447,13 @@ public class HeatmapModeController : MonoBehaviour
             int zoneCount = (int)Math.Round(v);
             int totalCount = (int)Math.Round(lastTotalVal);
 
-            body = $"Entradas: {zoneCount} / Total: {totalCount} ({percent:0.#}%)";
+            body = $"Entries: {zoneCount} / Total: {totalCount} ({percent:0.#}%)";
         }
         else
         {
             TimeSpan ts = TimeSpan.FromSeconds(v);
             string timeStr = $"{(int)ts.TotalHours}h {ts.Minutes:D2}m {ts.Seconds:D2}s";
-            body = $"Tempo ocupado: {timeStr} ({percent:0.#}%)";
+            body = $"Time Spent: {timeStr} ({percent:0.#}%)";
         }
 
         return true;

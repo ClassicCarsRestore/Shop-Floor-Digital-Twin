@@ -67,7 +67,6 @@ public class WarehouseDebugSpawner : MonoBehaviour
                         if (spawned >= boxesToSpawn)
                         {
                             warehouseManager.ShowAllStorage(rowsToShow);
-                            Debug.Log($"[WarehouseDebugSpawner] Spawned {spawned} boxes.");
                             return;
                         }
                     }

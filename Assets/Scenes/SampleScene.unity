@@ -2671,12 +2671,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 72fb8b83a95f3824084f5311f64a5385, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  forceSyntheticData: 1
+  forceSyntheticData: 0
   useSyntheticFallbackWhenEmpty: 0
   regenerateEachRequest: 0
-  scenario: 0
-  syntheticCars: 120
-  entriesPerCar: 200
+  scenario: 2
+  syntheticCars: 90
+  entriesPerCar: 120
   lookbackDays: 90
   randomSeed: 20260227
   skewedHotspotProbability: 0.72
@@ -16018,7 +16018,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 719808408}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.00000023322286, y: 0.7132506, z: -0.7009092, w: -0.0000002373294}
+  m_LocalRotation: {x: -0.00000023322228, y: 0.7132506, z: -0.7009092, w: -0.0000002373288}
   m_LocalPosition: {x: 582, y: 1099, z: -442}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -19890,7 +19890,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 963194225}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.00000023322286, y: 0.7132506, z: -0.7009092, w: -0.0000002373294}
+  m_LocalRotation: {x: -0.00000023322228, y: 0.7132506, z: -0.7009092, w: -0.0000002373288}
   m_LocalPosition: {x: 582, y: 1099, z: -442}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -22636,7 +22636,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 64ead33f68c3ab64b9789a32d9499956, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  bypassLoginAsAdmin: 1
+  bypassLoginAsAdmin: 0
   emailInput: {fileID: 792542552}
   passwordInput: {fileID: 1023333149}
   warningText: {fileID: 1517793141}
@@ -29589,10 +29589,12 @@ MonoBehaviour:
   heatmapHudPrefab: {fileID: 7147523799354240278, guid: 7a3fd6d863c0bea43851a49250a3bdb1, type: 3}
   heatmapChartUiPrefab: {fileID: 6001543558681053234, guid: f233f341ab8cd0042951436270ab4fe5, type: 3}
   syntheticDataProvider: {fileID: 86775481}
-  enableSyntheticHotkeys: 1
+  enableSyntheticHotkeys: 0
+  autoInjectSyntheticOnlyOncePerSession: 1
   includeBenchmarkInCampaign: 1
   campaignDateWindowsDays: 070000001e0000005a000000
   campaignReportFileName: heatmap-campaign-last.txt
+  backendWaitTimeoutSeconds: 12
   tooltipPrefab: {fileID: -3419022814119240726, guid: db5e5f0ca2b189546953c4f823470c61, type: 3}
   currentScale: 0
   currentCurve: 0

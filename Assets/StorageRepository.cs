@@ -42,7 +42,6 @@ public class StorageRepository : MonoBehaviour
         string url = !string.IsNullOrWhiteSpace(allStorageUrlOverride)
             ? allStorageUrlOverride
             : BuildDefaultItemsUrl();
-        Debug.Log("[StorageRepository] GET " + url);
         yield return GetItems(url, onSuccess, onError);
     }
 
@@ -52,7 +51,6 @@ public class StorageRepository : MonoBehaviour
         return $"{DefaultItemsBaseUrl}?skip=0&limit={safeLimit}";
     }
 
-    // ✅ Endpoint por carro
     // Swagger: GET /items/?charter_id={carId}
     public IEnumerator GetStorageForCar(string carId, Action<List<StorageRowDTO>> onSuccess, Action<string> onError)
     {
@@ -74,8 +72,6 @@ public class StorageRepository : MonoBehaviour
             url = $"/inventory/items/?charter_id={UnityWebRequest.EscapeURL(carId)}";
         }
 
-        Debug.Log("[StorageRepository] GET " + url);
-
         yield return GetItemsForCar(url, carId, onSuccess, onError);
     }
 
@@ -85,8 +81,6 @@ public class StorageRepository : MonoBehaviour
 
     private IEnumerator GetItems(string url, Action<List<StorageRowDTO>> onSuccess, Action<string> onError)
     {
-        Debug.Log("[StorageRepository][GetItems][START] " + url);
-
         using var req = UnityWebRequest.Get(url);
         req.SetRequestHeader("Accept", "application/json");
 
@@ -113,8 +107,6 @@ public class StorageRepository : MonoBehaviour
         }
 
         string json = req.downloadHandler.text;
-        Debug.Log($"[StorageRepository][GetItems][END] result={req.result} http={(int)req.responseCode}");
-        Debug.Log("[StorageRepository][GetItems][RESPONSE_JSON_RAW] " + json);
 
         List<StorageRowDTO> rows;
         try
@@ -139,7 +131,6 @@ public class StorageRepository : MonoBehaviour
             }
         }
 
-        Debug.Log($"[StorageRepository] Parsed rows = {rows.Count}");
         SaveRowsCache(rows);
         onSuccess?.Invoke(rows);
     }
@@ -150,8 +141,6 @@ public class StorageRepository : MonoBehaviour
         Action<List<StorageRowDTO>> onSuccess,
         Action<string> onError)
     {
-        Debug.Log("[StorageRepository][GetItemsForCar][START] " + url + " carId=" + carId);
-
         using var req = UnityWebRequest.Get(url);
         req.SetRequestHeader("Accept", "application/json");
 
@@ -168,8 +157,6 @@ public class StorageRepository : MonoBehaviour
         }
 
         string json = req.downloadHandler.text;
-        Debug.Log($"[StorageRepository][GetItemsForCar][END] result={req.result} http={(int)req.responseCode}");
-        Debug.Log("[StorageRepository][GetItemsForCar][RESPONSE_JSON_RAW] " + json);
 
         List<StorageRowDTO> rows;
         try
@@ -184,7 +171,6 @@ public class StorageRepository : MonoBehaviour
             rows = new List<StorageRowDTO>();
         }
 
-        Debug.Log($"[StorageRepository] Parsed car item rows = {rows.Count} (carId={carId})");
         onSuccess?.Invoke(rows);
     }
 
@@ -248,7 +234,6 @@ public class StorageRepository : MonoBehaviour
                 skipped++;
         }
 
-        Debug.Log($"[StorageRepository][GetItems][MAP] mapped={rows.Count} skipped={skipped}");
         return rows;
     }
 

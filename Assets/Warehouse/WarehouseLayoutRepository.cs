@@ -12,16 +12,12 @@ public class WarehouseLayoutRepository : MonoBehaviour
 
     public IEnumerator GetLayout(Action<WarehouseLayoutDTO> onSuccess, Action<string> onError)
     {
-        Debug.Log("[WarehouseLayoutRepository][GET][START] url=" + LayoutUrl);
-
         using var req = UnityWebRequest.Get(LayoutUrl);
         req.SetRequestHeader("Accept", "application/json");
 
         yield return req.SendWebRequest();
 
         string responseBody = req.downloadHandler != null ? req.downloadHandler.text : "";
-        Debug.Log($"[WarehouseLayoutRepository][GET][END] result={req.result} http={(int)req.responseCode} error={req.error}");
-        Debug.Log("[WarehouseLayoutRepository][GET][RESPONSE_JSON_RAW] " + responseBody);
 
         if (req.result != UnityWebRequest.Result.Success)
         {
@@ -35,8 +31,6 @@ public class WarehouseLayoutRepository : MonoBehaviour
         {
             var json = responseBody;
             var dto = TryParseLayout(json);
-            int sectionCount = dto?.sections != null ? dto.sections.Count : 0;
-            Debug.Log($"[WarehouseLayoutRepository][GET][PARSE_OK] sections={sectionCount}");
             SaveLayoutCache(json);
             onSuccess?.Invoke(dto);
         }
@@ -57,9 +51,6 @@ public class WarehouseLayoutRepository : MonoBehaviour
         }
 
         string json = JsonConvert.SerializeObject(layout);
-        int sectionCount = layout.sections != null ? layout.sections.Count : 0;
-        Debug.Log($"[WarehouseLayoutRepository][PUT][START] url={LayoutUrl} sections={sectionCount}");
-        Debug.Log("[WarehouseLayoutRepository][PUT][REQUEST_JSON_RAW] " + json);
         byte[] bytes = System.Text.Encoding.UTF8.GetBytes(json);
 
         using var req = new UnityWebRequest(LayoutUrl, "PUT");
@@ -71,8 +62,6 @@ public class WarehouseLayoutRepository : MonoBehaviour
         yield return req.SendWebRequest();
 
         string responseBody = req.downloadHandler != null ? req.downloadHandler.text : "";
-        Debug.Log($"[WarehouseLayoutRepository][PUT][END] result={req.result} http={(int)req.responseCode} error={req.error}");
-        Debug.Log("[WarehouseLayoutRepository][PUT][RESPONSE_RAW] " + responseBody);
 
         if (req.result != UnityWebRequest.Result.Success)
         {
@@ -81,8 +70,6 @@ public class WarehouseLayoutRepository : MonoBehaviour
             onError?.Invoke(msg);
             yield break;
         }
-
-        Debug.Log("[WarehouseLayoutRepository][PUT][SUCCESS]");
 
         try
         {
@@ -121,7 +108,6 @@ public class WarehouseLayoutRepository : MonoBehaviour
     {
         if (string.IsNullOrWhiteSpace(json))
         {
-            Debug.LogWarning("[WarehouseLayoutRepository][GET][PARSE_EMPTY] body vazio/null -> layout vazio");
             return EmptyLayout();
         }
 
@@ -129,7 +115,6 @@ public class WarehouseLayoutRepository : MonoBehaviour
         var direct = JsonConvert.DeserializeObject<WarehouseLayoutDTO>(json);
         if (direct != null && direct.sections != null)
         {
-            Debug.Log($"[WarehouseLayoutRepository][GET][PARSE_DIRECT] sections={direct.sections.Count}");
             return direct;
         }
 
@@ -141,8 +126,6 @@ public class WarehouseLayoutRepository : MonoBehaviour
             if (obj["sections"] is JArray)
             {
                 var dto = obj.ToObject<WarehouseLayoutDTO>();
-                int c = dto?.sections != null ? dto.sections.Count : 0;
-                Debug.Log($"[WarehouseLayoutRepository][GET][PARSE_OBJECT_SECTIONS] sections={c}");
                 return dto ?? EmptyLayout();
             }
 
@@ -155,7 +138,6 @@ public class WarehouseLayoutRepository : MonoBehaviour
                     if (dto != null)
                     {
                         if (dto.sections == null) dto.sections = new System.Collections.Generic.List<SectionLayoutDTO>();
-                        Debug.Log($"[WarehouseLayoutRepository][GET][PARSE_WRAPPED] sections={dto.sections.Count}");
                         return dto;
                     }
                 }
@@ -167,7 +149,6 @@ public class WarehouseLayoutRepository : MonoBehaviour
         {
             var sections = arr.ToObject<System.Collections.Generic.List<SectionLayoutDTO>>()
                            ?? new System.Collections.Generic.List<SectionLayoutDTO>();
-            Debug.Log($"[WarehouseLayoutRepository][GET][PARSE_ARRAY] sections={sections.Count}");
             return new WarehouseLayoutDTO { sections = sections };
         }
 

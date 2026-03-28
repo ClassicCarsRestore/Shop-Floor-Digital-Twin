@@ -104,7 +104,6 @@ public class WarehouseEditPanel : MonoBehaviour
 
         Destroy(current.gameObject);
 
-        // depois de apagar, limpa sele��o (reativa movement e fecha painel)
         if (selection != null) selection.ClearSelection();
         else Hide();
 
@@ -116,11 +115,9 @@ public class WarehouseEditPanel : MonoBehaviour
     {
         WarehouseBoxDetailsPanel.Instance?.Hide();
 
-        // restaurar pose da c�mara
         if (cameraSystem != null)
             cameraSystem.RestoreAfterSectionFocus();
 
-        // isto vai: esconder este painel + reativar movement
         if (selection != null) selection.ClearSelection();
         else Hide();
 
@@ -133,10 +130,8 @@ public class WarehouseEditPanel : MonoBehaviour
         if (current == null) return;
         WarehouseBoxDetailsPanel.Instance?.Hide();
 
-        // desativa bot�es de edi��o imediatamente 
         SetEditButtonsInteractable(false);
 
-        // ao come�ar move placement: controls ON
         if (cameraSystem != null)
             cameraSystem.ActiveControls();
 
@@ -189,12 +184,8 @@ public class WarehouseEditPanel : MonoBehaviour
     }
 
 
-    // ----------------------------
-    // EVENTS do SectionPlacementController
-    // ----------------------------
     private void HandleEditPlacementStarted(ShelfSection section)
     {
-        // s� reage se for a section atualmente selecionada
         if (current != section) return;
 
         WarehouseBoxDetailsPanel.Instance?.Hide();
@@ -212,11 +203,10 @@ public class WarehouseEditPanel : MonoBehaviour
         SetEditButtonsInteractable(true);
         if (selection != null)
         {
-            selection.SelectSection(section); //focar camera + mostrar painel + desativar controls
+            selection.SelectSection(section);
         }
         else
         {
-            // fallback: mostra painel e desativa controls
             gameObject.SetActive(true);
             if (cameraSystem != null) cameraSystem.DesactiveControls();
         }
@@ -227,17 +217,12 @@ public class WarehouseEditPanel : MonoBehaviour
 
 
 
-    // ----------------------------
-    // EVENTS do SectionRemodelController
-    // ----------------------------
-
     private void HandleRemodelStarted(ShelfSection section)
     {
         if (current != section) return;
 
         WarehouseBoxDetailsPanel.Instance?.Hide();
 
-        // esconder bot�es do edit enquanto remodel est� aberto
         gameObject.SetActive(false);
 
         WarehouseHUD.Instance?.EnterEditMode();
@@ -248,10 +233,9 @@ public class WarehouseEditPanel : MonoBehaviour
         if (current != section) return;
 
         WarehouseHUD.Instance?.EnterEditMode();
-        // voltar ao modo normal de edi��o: section continua selecionada
         if (selection != null)
         {
-            selection.SelectSection(section); // foca camera + mostra edit panel + controls OFF
+            selection.SelectSection(section);
         }
         else
         {
