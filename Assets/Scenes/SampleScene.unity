@@ -8787,7 +8787,6 @@ MonoBehaviour:
   cacheMonthWeeklySeconds: 60
   cachePowerTimeseriesSeconds: 10
   cacheEnergyDaySeriesSeconds: 120
-  debugEnergyEndpointLogs: 1
 --- !u!114 &412254999
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -29590,11 +29589,10 @@ MonoBehaviour:
   heatmapChartUiPrefab: {fileID: 6001543558681053234, guid: f233f341ab8cd0042951436270ab4fe5, type: 3}
   syntheticDataProvider: {fileID: 86775481}
   enableSyntheticHotkeys: 0
-  autoInjectSyntheticOnlyOncePerSession: 1
+  enableSyntheticRuntime: 0
   includeBenchmarkInCampaign: 1
   campaignDateWindowsDays: 070000001e0000005a000000
   campaignReportFileName: heatmap-campaign-last.txt
-  backendWaitTimeoutSeconds: 12
   tooltipPrefab: {fileID: -3419022814119240726, guid: db5e5f0ca2b189546953c4f823470c61, type: 3}
   currentScale: 0
   currentCurve: 0
