@@ -2,10 +2,9 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Networking;
-using TMPro;
-
 
 public class EnergyPanelController : MonoBehaviour
 {
@@ -16,18 +15,36 @@ public class EnergyPanelController : MonoBehaviour
     [SerializeField] private bool autoRefresh = true;
 
     [Header("Panels - Totals")]
-    [SerializeField] private MetricPanelUI currentEnergyPanel; // total current power (W)
-    [SerializeField] private MetricPanelUI monthEnergyPanel;   // total month energy (kWh)
+    [SerializeField] private MetricPanelUI currentEnergyPanel;
+    [SerializeField] private MetricPanelUI monthEnergyPanel;
 
     [Header("Panels - Current (W)")]
-    [SerializeField] private MetricPanelUI currentRightBoothPanel;
-    [SerializeField] private MetricPanelUI currentLeftBoothPanel;
-    [SerializeField] private MetricPanelUI currentSandBlastPanel;
+    [SerializeField] private MetricPanelUI currentJatoAreiaPanel;
+    [SerializeField] private MetricPanelUI currentPinturaDireitaPanel;
+    [SerializeField] private MetricPanelUI currentPinturaEsquerdaPanel;
+    [SerializeField] private MetricPanelUI currentQuadroPainelSolarPanel;
+    [SerializeField] private MetricPanelUI currentCompressorPanel;
+    [SerializeField] private MetricPanelUI currentCarregadorParedePanel;
+    [SerializeField] private MetricPanelUI currentBateChapasEsquerdaPanel;
+    [SerializeField] private MetricPanelUI currentBateChapasDireitaPanel;
+    [SerializeField] private MetricPanelUI currentArCondicionadoPanel;
+    [SerializeField] private MetricPanelUI currentSalaConvivioPanel;
+    [SerializeField] private MetricPanelUI currentTomadasOficinaPanel;
+    [SerializeField] private MetricPanelUI currentPortaoEletricoPanel;
 
     [Header("Panels - Month (kWh)")]
-    [SerializeField] private MetricPanelUI monthRightBoothPanel;
-    [SerializeField] private MetricPanelUI monthLeftBoothPanel;
-    [SerializeField] private MetricPanelUI monthSandBlastPanel;
+    [SerializeField] private MetricPanelUI monthJatoAreiaPanel;
+    [SerializeField] private MetricPanelUI monthPinturaDireitaPanel;
+    [SerializeField] private MetricPanelUI monthPinturaEsquerdaPanel;
+    [SerializeField] private MetricPanelUI monthQuadroPainelSolarPanel;
+    [SerializeField] private MetricPanelUI monthCompressorPanel;
+    [SerializeField] private MetricPanelUI monthCarregadorParedePanel;
+    [SerializeField] private MetricPanelUI monthBateChapasEsquerdaPanel;
+    [SerializeField] private MetricPanelUI monthBateChapasDireitaPanel;
+    [SerializeField] private MetricPanelUI monthArCondicionadoPanel;
+    [SerializeField] private MetricPanelUI monthSalaConvivioPanel;
+    [SerializeField] private MetricPanelUI monthTomadasOficinaPanel;
+    [SerializeField] private MetricPanelUI monthPortaoEletricoPanel;
 
     [Header("Frontend Cache")]
     [SerializeField] private bool enableFrontendCache = true;
@@ -39,39 +56,47 @@ public class EnergyPanelController : MonoBehaviour
     [SerializeField] private float cachePowerTimeseriesSeconds = 10f;
     [SerializeField] private float cacheEnergyDaySeriesSeconds = 120f;
 
-    [Serializable]
-    public class EnergyDaySeriesResponse
+    private const string ID_JATO_AREIA = "shelly3EMJatoAreia";
+    private const string ID_PINTURA_DIREITA = "shelly3EMPinturaDireita";
+    private const string ID_PINTURA_ESQUERDA = "shelly3EMPinturaEsquerda";
+    private const string ID_QUADRO_PAINEL_SOLAR = "shelly3EMQuadroPainelSolar";
+    private const string ID_COMPRESSOR = "shelly3EMCompressor";
+    private const string ID_CARREGADOR_PAREDE = "shelly3EMCarregadorParede";
+    private const string ID_BATE_CHAPAS_ESQ = "shelly3EMBateChapasEsquerda";
+    private const string ID_BATE_CHAPAS_DIR = "shelly3EMBateChapasDireita";
+    private const string ID_AR_CONDICIONADO = "shellyProEM50ArCondicionado";
+    private const string ID_SALA_CONVIVIO = "shellyProEM50SalaConvivio";
+    private const string ID_TOMADAS_OFICINA = "shellyProEM50TomadasOficina";
+    private const string ID_PORTAO_ELETRICO = "shellyProEM50PortaoEletrico";
+
+    private const string LABEL_JATO_AREIA = "Jato de Areia";
+    private const string LABEL_PINTURA_DIREITA = "Pintura Direita";
+    private const string LABEL_PINTURA_ESQUERDA = "Pintura Esquerda";
+    private const string LABEL_QUADRO_PAINEL_SOLAR = "Quadro Painel Solar";
+    private const string LABEL_COMPRESSOR = "Compressor";
+    private const string LABEL_CARREGADOR_PAREDE = "Carregador Parede";
+    private const string LABEL_BATE_CHAPAS_ESQ = "Bate Chapas Esquerda";
+    private const string LABEL_BATE_CHAPAS_DIR = "Bate Chapas Direita";
+    private const string LABEL_AR_CONDICIONADO = "Ar Condicionado";
+    private const string LABEL_SALA_CONVIVIO = "Sala Convivio";
+    private const string LABEL_TOMADAS_OFICINA = "Tomadas Oficina";
+    private const string LABEL_PORTAO_ELETRICO = "Portao Eletrico";
+
+    private static readonly string[] METER_IDS =
     {
-        public string period;  // "YYYY-MM"
-        public string unit;    // "kWh"
-        public Dictionary<string, MeterSeries> meters; // chave = id do meter
-    }
-
-    [Serializable]
-    public class MeterSeries
-    {
-        public string label;
-        public List<DayPoint> points;
-    }
-
-    [Serializable]
-    public class DayPoint
-    {
-        public string date; // "YYYY-MM-DD"
-        public float value; // kWh
-    }
-
-
-
-
-    // ids (t�m de bater com a API)
-    private const string ID_RIGHT = "shelly3EMPinturaDireita";
-    private const string ID_LEFT = "shelly3EMPinturaEsquerda";
-    private const string ID_SAND = "shelly3EMJatoAreia";
-
-    private const string LABEL_SAND = "Jato de Areia";
-    private const string LABEL_RIGHT = "Pintura Direita";
-    private const string LABEL_LEFT = "Pintura Esquerda";
+        ID_JATO_AREIA,
+        ID_PINTURA_DIREITA,
+        ID_PINTURA_ESQUERDA,
+        ID_QUADRO_PAINEL_SOLAR,
+        ID_COMPRESSOR,
+        ID_CARREGADOR_PAREDE,
+        ID_BATE_CHAPAS_ESQ,
+        ID_BATE_CHAPAS_DIR,
+        ID_AR_CONDICIONADO,
+        ID_SALA_CONVIVIO,
+        ID_TOMADAS_OFICINA,
+        ID_PORTAO_ELETRICO
+    };
 
     private Coroutine refreshCo;
 
@@ -98,7 +123,6 @@ public class EnergyPanelController : MonoBehaviour
         }
     }
 
-    // ---------- API DTOs (Overview) ----------
     [Serializable]
     public class OverviewResponse
     {
@@ -125,8 +149,6 @@ public class EnergyPanelController : MonoBehaviour
         public bool is_running;
     }
 
-    // ---------- API DTOs (Breakdown Month) ----------
-    // Nota: JsonUtility suporta List<T> em classes [Serializable]
     [Serializable]
     public class BreakdownMonthResponse
     {
@@ -140,22 +162,20 @@ public class EnergyPanelController : MonoBehaviour
     [Serializable]
     public class EnergyTrendMonthsResponse
     {
-        public string unit;           // "kWh"
-        public int months;            // 5
-        public string[] labels;       // ["Dez 2025", ...]
-        public float[] values;        // [..]
+        public string unit;
+        public int months;
+        public bool include_current;
+        public string[] labels;
+        public float[] values;
     }
-
-
-
 
     [Serializable]
     public class EnergyTrendPayload
     {
         public string title;
         public string subtitle;
-        public System.Collections.Generic.List<string> categories;
-        public System.Collections.Generic.List<float> values;
+        public List<string> categories;
+        public List<float> values;
         public string unit;
     }
 
@@ -197,6 +217,15 @@ public class EnergyPanelController : MonoBehaviour
         public PowerTimeseriesMeter shelly3EMJatoAreia;
         public PowerTimeseriesMeter shelly3EMPinturaDireita;
         public PowerTimeseriesMeter shelly3EMPinturaEsquerda;
+        public PowerTimeseriesMeter shelly3EMQuadroPainelSolar;
+        public PowerTimeseriesMeter shelly3EMCompressor;
+        public PowerTimeseriesMeter shelly3EMCarregadorParede;
+        public PowerTimeseriesMeter shelly3EMBateChapasEsquerda;
+        public PowerTimeseriesMeter shelly3EMBateChapasDireita;
+        public PowerTimeseriesMeter shellyProEM50ArCondicionado;
+        public PowerTimeseriesMeter shellyProEM50SalaConvivio;
+        public PowerTimeseriesMeter shellyProEM50TomadasOficina;
+        public PowerTimeseriesMeter shellyProEM50PortaoEletrico;
     }
 
     [Serializable]
@@ -204,6 +233,8 @@ public class EnergyPanelController : MonoBehaviour
     {
         public string generated_at;
         public string window;
+        public string from;
+        public string to;
         public string every;
         public string unit;
         public PowerTimeseriesMeters meters;
@@ -229,6 +260,15 @@ public class EnergyPanelController : MonoBehaviour
         public EnergyDayMeter shelly3EMJatoAreia;
         public EnergyDayMeter shelly3EMPinturaDireita;
         public EnergyDayMeter shelly3EMPinturaEsquerda;
+        public EnergyDayMeter shelly3EMQuadroPainelSolar;
+        public EnergyDayMeter shelly3EMCompressor;
+        public EnergyDayMeter shelly3EMCarregadorParede;
+        public EnergyDayMeter shelly3EMBateChapasEsquerda;
+        public EnergyDayMeter shelly3EMBateChapasDireita;
+        public EnergyDayMeter shellyProEM50ArCondicionado;
+        public EnergyDayMeter shellyProEM50SalaConvivio;
+        public EnergyDayMeter shellyProEM50TomadasOficina;
+        public EnergyDayMeter shellyProEM50PortaoEletrico;
     }
 
     [Serializable]
@@ -311,7 +351,6 @@ public class EnergyPanelController : MonoBehaviour
         public MonthWeeklySeries[] series;
     }
 
-
     private void OnEnable()
     {
         if (autoRefresh)
@@ -344,8 +383,6 @@ public class EnergyPanelController : MonoBehaviour
         }
     }
 
-    // ----------- PUBLIC API for binders -----------
-
     public void RequestBreakdownMonth(Action<BreakdownMonthResponse> onSuccess, Action<string> onError = null)
     {
         const string cacheKey = "breakdown_month";
@@ -357,11 +394,11 @@ public class EnergyPanelController : MonoBehaviour
 
         StartCoroutine(FetchBreakdownMonth(onSuccess, onError));
     }
+
     public void RequestMonthlyTrendLastMonths(
         int months,
         Action<EnergyTrendPayload> onOk,
-        Action<string> onErr
-    )
+        Action<string> onErr)
     {
         string cacheKey = $"trend_months_{months}";
         if (TryGetFrontendCache(cacheKey, out EnergyTrendPayload cached))
@@ -537,8 +574,6 @@ public class EnergyPanelController : MonoBehaviour
         StartCoroutine(_RequestMonthWeeklyCo(onOk, onErr));
     }
 
-    // ----------- Internal HTTP calls -----------
-
     private IEnumerator FetchAndApplyOverview()
     {
         string url = BuildUrl("/energy/dashboard/overview");
@@ -547,7 +582,12 @@ public class EnergyPanelController : MonoBehaviour
             url,
             data =>
             {
-                if (data == null) { ApplyErrorState(); return; }
+                if (data == null)
+                {
+                    ApplyErrorState();
+                    return;
+                }
+
                 ApplyToUI(data);
                 OverviewUpdated?.Invoke(data);
             },
@@ -617,14 +657,13 @@ public class EnergyPanelController : MonoBehaviour
     private IEnumerator _RequestMonthlyTrendLastMonthsCo(
         int months,
         Action<EnergyTrendPayload> onOk,
-        Action<string> onErr
-    )
+        Action<string> onErr)
     {
         string url = apiBaseUrl.TrimEnd('/') + "/energy/trend/months?months=" + months;
 
         using (UnityWebRequest req = UnityWebRequest.Get(url))
         {
-            req.timeout = 10;
+            req.timeout = requestTimeoutSeconds;
             yield return req.SendWebRequest();
 
             if (req.result != UnityWebRequest.Result.Success)
@@ -636,7 +675,10 @@ public class EnergyPanelController : MonoBehaviour
             var json = req.downloadHandler.text;
             EnergyTrendMonthsResponse data = null;
 
-            try { data = JsonUtility.FromJson<EnergyTrendMonthsResponse>(json); }
+            try
+            {
+                data = JsonUtility.FromJson<EnergyTrendMonthsResponse>(json);
+            }
             catch (Exception e)
             {
                 onErr?.Invoke($"JSON parse failed: {e.Message}\n{json}");
@@ -661,8 +703,8 @@ public class EnergyPanelController : MonoBehaviour
                 title = "Energy Consumption Monthly Trend",
                 subtitle = "",
                 unit = data.unit ?? "kWh",
-                categories = new System.Collections.Generic.List<string>(n),
-                values = new System.Collections.Generic.List<float>(n),
+                categories = new List<string>(n),
+                values = new List<float>(n),
             };
 
             for (int i = 0; i < n; i++)
@@ -672,7 +714,6 @@ public class EnergyPanelController : MonoBehaviour
             }
 
             SetFrontendCache($"trend_months_{months}", payload, cacheTrendMonthsSeconds);
-
             onOk?.Invoke(payload);
         }
     }
@@ -716,7 +757,10 @@ public class EnergyPanelController : MonoBehaviour
             string json = req.downloadHandler.text;
             PowerTimeseriesResponse data = null;
 
-            try { data = JsonUtility.FromJson<PowerTimeseriesResponse>(json); }
+            try
+            {
+                data = JsonUtility.FromJson<PowerTimeseriesResponse>(json);
+            }
             catch (Exception e)
             {
                 onErr?.Invoke($"JSON parse failed: {e.Message}");
@@ -729,24 +773,18 @@ public class EnergyPanelController : MonoBehaviour
                 yield break;
             }
 
-            var rawSeries = new List<(string meterId, PowerTimeseriesMeter meter)>(3)
-            {
-                (ID_SAND, data.meters.shelly3EMJatoAreia),
-                (ID_RIGHT, data.meters.shelly3EMPinturaDireita),
-                (ID_LEFT, data.meters.shelly3EMPinturaEsquerda),
-            };
-
             var timeKeys = new List<string>();
             var timeSet = new HashSet<string>();
             var seriesNames = new List<string>();
             var seriesPointsByTime = new List<Dictionary<string, float>>();
 
-            for (int s = 0; s < rawSeries.Count; s++)
+            for (int i = 0; i < METER_IDS.Length; i++)
             {
-                var meter = rawSeries[s].meter;
+                string meterId = METER_IDS[i];
+                PowerTimeseriesMeter meter = GetPowerTimeseriesMeter(data.meters, meterId);
                 if (meter == null) continue;
 
-                string label = string.IsNullOrWhiteSpace(meter.label) ? rawSeries[s].meterId : meter.label;
+                string label = string.IsNullOrWhiteSpace(meter.label) ? GetDefaultLabelForMeterId(meterId) : meter.label;
                 var byTime = new Dictionary<string, float>();
 
                 if (meter.points != null)
@@ -758,7 +796,8 @@ public class EnergyPanelController : MonoBehaviour
 
                         float value = Mathf.Max(0f, point.value);
                         byTime[point.time] = value;
-                        if (timeSet.Add(point.time)) timeKeys.Add(point.time);
+                        if (timeSet.Add(point.time))
+                            timeKeys.Add(point.time);
                     }
                 }
 
@@ -787,24 +826,18 @@ public class EnergyPanelController : MonoBehaviour
                 if (DateTime.TryParse(raw, null, DateTimeStyles.RoundtripKind, out var dt))
                 {
                     if (safeEvery == "1m" || safeEvery == "3h")
-                    {
                         categories.Add(dt.ToLocalTime().ToString("HH:mm"));
-                    }
                     else if (safeEvery == "1d")
-                    {
                         categories.Add(dt.ToLocalTime().ToString("dd/MM"));
-                    }
                     else if (safeEvery == "7d")
-                    {
                         categories.Add($"Week {i + 1}");
-                    }
                     else
-                    {
                         categories.Add(dt.ToLocalTime().ToString("dd/MM HH:mm"));
-                    }
                 }
                 else
+                {
                     categories.Add(raw);
+                }
             }
 
             var payload = new EnergyUsageChartPayload
@@ -826,8 +859,10 @@ public class EnergyPanelController : MonoBehaviour
 
                 for (int i = 0; i < timeKeys.Count; i++)
                 {
-                    if (byTime.TryGetValue(timeKeys[i], out var v)) values.Add(v);
-                    else values.Add(0f);
+                    if (byTime.TryGetValue(timeKeys[i], out var v))
+                        values.Add(v);
+                    else
+                        values.Add(0f);
                 }
 
                 payload.series.Add(new EnergyUsageSeries
@@ -842,94 +877,6 @@ public class EnergyPanelController : MonoBehaviour
 
             onOk?.Invoke(payload);
         }
-    }
-
-    private EnergyUsageChartPayload FilterPayloadByDateRange(
-        EnergyUsageChartPayload payload,
-        DateTime fromInclusive,
-        DateTime toInclusive)
-    {
-        if (payload == null || payload.timestamps == null || payload.series == null)
-            return payload;
-
-        if (toInclusive < fromInclusive)
-        {
-            DateTime tmp = fromInclusive;
-            fromInclusive = toInclusive;
-            toInclusive = tmp;
-        }
-
-        DateTime fromDate = fromInclusive.Date;
-        DateTime toDate = toInclusive.Date;
-
-        var keepIdx = new List<int>();
-        for (int i = 0; i < payload.timestamps.Count; i++)
-        {
-            string ts = payload.timestamps[i];
-            if (!DateTime.TryParse(ts, null, DateTimeStyles.RoundtripKind, out var dt))
-                continue;
-
-            DateTime localDate = dt.ToLocalTime().Date;
-            if (localDate >= fromDate && localDate <= toDate)
-                keepIdx.Add(i);
-        }
-
-        if (keepIdx.Count == 0)
-        {
-            return new EnergyUsageChartPayload
-            {
-                title = payload.title,
-                subtitle = payload.subtitle,
-                unit = payload.unit,
-                categories = new List<string>(),
-                timestamps = new List<string>(),
-                series = payload.series != null ? new List<EnergyUsageSeries>(payload.series.Count) : new List<EnergyUsageSeries>()
-            };
-        }
-
-        var filtered = new EnergyUsageChartPayload
-        {
-            title = payload.title,
-            subtitle = $"{fromDate:yyyy-MM-dd} → {toDate:yyyy-MM-dd}",
-            unit = payload.unit,
-            categories = new List<string>(keepIdx.Count),
-            timestamps = new List<string>(keepIdx.Count),
-            series = new List<EnergyUsageSeries>(payload.series.Count)
-        };
-
-        for (int k = 0; k < keepIdx.Count; k++)
-        {
-            int idx = keepIdx[k];
-            filtered.timestamps.Add(payload.timestamps[idx]);
-
-            if (payload.categories != null && idx < payload.categories.Count)
-                filtered.categories.Add(payload.categories[idx]);
-            else
-                filtered.categories.Add((k + 1).ToString());
-        }
-
-        for (int s = 0; s < payload.series.Count; s++)
-        {
-            var src = payload.series[s];
-            if (src == null)
-                continue;
-
-            var vals = new List<float>(keepIdx.Count);
-            for (int k = 0; k < keepIdx.Count; k++)
-            {
-                int idx = keepIdx[k];
-                float v = (src.values != null && idx < src.values.Count) ? src.values[idx] : 0f;
-                vals.Add(v);
-            }
-
-            filtered.series.Add(new EnergyUsageSeries
-            {
-                name = src.name,
-                values = vals
-            });
-        }
-
-        return filtered;
     }
 
     private IEnumerator _RequestEnergyDaySeriesCo(
@@ -954,7 +901,10 @@ public class EnergyPanelController : MonoBehaviour
             string json = req.downloadHandler.text;
             EnergyDayResponse data = null;
 
-            try { data = JsonUtility.FromJson<EnergyDayResponse>(json); }
+            try
+            {
+                data = JsonUtility.FromJson<EnergyDayResponse>(json);
+            }
             catch (Exception e)
             {
                 onErr?.Invoke($"JSON parse failed: {e.Message}");
@@ -968,7 +918,6 @@ public class EnergyPanelController : MonoBehaviour
             }
 
             SetFrontendCache($"energy_day_{safeMonth}", data, cacheEnergyDaySeriesSeconds);
-
             onOk?.Invoke(data);
         }
     }
@@ -980,19 +929,15 @@ public class EnergyPanelController : MonoBehaviour
         Action<EnergyUsageChartPayload> onOk,
         Action<string> onErr)
     {
-        var labelsByMeter = new Dictionary<string, string>
-        {
-            { ID_SAND, LABEL_SAND },
-            { ID_RIGHT, LABEL_RIGHT },
-            { ID_LEFT, LABEL_LEFT }
-        };
+        var labelsByMeter = new Dictionary<string, string>();
+        var valuesByMeterDate = new Dictionary<string, Dictionary<DateTime, float>>();
 
-        var valuesByMeterDate = new Dictionary<string, Dictionary<DateTime, float>>
+        for (int i = 0; i < METER_IDS.Length; i++)
         {
-            { ID_SAND, new Dictionary<DateTime, float>() },
-            { ID_RIGHT, new Dictionary<DateTime, float>() },
-            { ID_LEFT, new Dictionary<DateTime, float>() }
-        };
+            string meterId = METER_IDS[i];
+            labelsByMeter[meterId] = GetDefaultLabelForMeterId(meterId);
+            valuesByMeterDate[meterId] = new Dictionary<DateTime, float>();
+        }
 
         string unit = "kWh";
 
@@ -1020,7 +965,10 @@ public class EnergyPanelController : MonoBehaviour
                         yield break;
                     }
 
-                    try { monthData = JsonUtility.FromJson<EnergyDayResponse>(req.downloadHandler.text); }
+                    try
+                    {
+                        monthData = JsonUtility.FromJson<EnergyDayResponse>(req.downloadHandler.text);
+                    }
                     catch (Exception e)
                     {
                         onErr?.Invoke($"JSON parse failed: {e.Message}");
@@ -1042,9 +990,18 @@ public class EnergyPanelController : MonoBehaviour
                 if (!string.IsNullOrWhiteSpace(monthData.unit))
                     unit = monthData.unit;
 
-                MergeEnergyDayMeter(monthData.meters.shelly3EMJatoAreia, ID_SAND, labelsByMeter, valuesByMeterDate, fromDate, toDate);
-                MergeEnergyDayMeter(monthData.meters.shelly3EMPinturaDireita, ID_RIGHT, labelsByMeter, valuesByMeterDate, fromDate, toDate);
-                MergeEnergyDayMeter(monthData.meters.shelly3EMPinturaEsquerda, ID_LEFT, labelsByMeter, valuesByMeterDate, fromDate, toDate);
+                for (int i = 0; i < METER_IDS.Length; i++)
+                {
+                    string meterId = METER_IDS[i];
+                    MergeEnergyDayMeter(
+                        GetEnergyDayMeter(monthData.meters, meterId),
+                        meterId,
+                        labelsByMeter,
+                        valuesByMeterDate,
+                        fromDate,
+                        toDate
+                    );
+                }
             }
 
             monthCursor = monthCursor.AddMonths(1);
@@ -1068,13 +1025,12 @@ public class EnergyPanelController : MonoBehaviour
             unit = string.IsNullOrWhiteSpace(unit) ? "kWh" : unit,
             categories = categories,
             timestamps = timestamps,
-            series = new List<EnergyUsageSeries>(3)
+            series = new List<EnergyUsageSeries>(METER_IDS.Length)
         };
 
-        string[] meterOrder = { ID_SAND, ID_RIGHT, ID_LEFT };
-        for (int m = 0; m < meterOrder.Length; m++)
+        for (int m = 0; m < METER_IDS.Length; m++)
         {
-            string meterId = meterOrder[m];
+            string meterId = METER_IDS[m];
             var meterValues = valuesByMeterDate[meterId];
             var values = new List<float>(dayCount);
 
@@ -1145,7 +1101,10 @@ public class EnergyPanelController : MonoBehaviour
             }
 
             TodayHourlyResponse data = null;
-            try { data = JsonUtility.FromJson<TodayHourlyResponse>(req.downloadHandler.text); }
+            try
+            {
+                data = JsonUtility.FromJson<TodayHourlyResponse>(req.downloadHandler.text);
+            }
             catch (Exception e)
             {
                 onErr?.Invoke($"JSON parse failed: {e.Message}");
@@ -1159,7 +1118,6 @@ public class EnergyPanelController : MonoBehaviour
             }
 
             SetFrontendCache("today_hourly", data, cacheTodayHourlySeconds);
-
             onOk?.Invoke(data);
         }
     }
@@ -1182,7 +1140,10 @@ public class EnergyPanelController : MonoBehaviour
             }
 
             WeekDailyResponse data = null;
-            try { data = JsonUtility.FromJson<WeekDailyResponse>(req.downloadHandler.text); }
+            try
+            {
+                data = JsonUtility.FromJson<WeekDailyResponse>(req.downloadHandler.text);
+            }
             catch (Exception e)
             {
                 onErr?.Invoke($"JSON parse failed: {e.Message}");
@@ -1196,7 +1157,6 @@ public class EnergyPanelController : MonoBehaviour
             }
 
             SetFrontendCache("week_daily", data, cacheWeekDailySeconds);
-
             onOk?.Invoke(data);
         }
     }
@@ -1219,7 +1179,10 @@ public class EnergyPanelController : MonoBehaviour
             }
 
             MonthWeeklyResponse data = null;
-            try { data = JsonUtility.FromJson<MonthWeeklyResponse>(req.downloadHandler.text); }
+            try
+            {
+                data = JsonUtility.FromJson<MonthWeeklyResponse>(req.downloadHandler.text);
+            }
             catch (Exception e)
             {
                 onErr?.Invoke($"JSON parse failed: {e.Message}");
@@ -1233,7 +1196,6 @@ public class EnergyPanelController : MonoBehaviour
             }
 
             SetFrontendCache("month_weekly", data, cacheMonthWeeklySeconds);
-
             onOk?.Invoke(data);
         }
     }
@@ -1267,11 +1229,6 @@ public class EnergyPanelController : MonoBehaviour
         };
     }
 
-
-
-
-
-    // helper raw json no controller
     private IEnumerator GetJsonRaw(string url, Action<string> onSuccess, Action<string> onError)
     {
         using (var req = UnityWebRequest.Get(url))
@@ -1289,24 +1246,18 @@ public class EnergyPanelController : MonoBehaviour
         }
     }
 
-
     private string BuildUrl(string path)
     {
         return apiBaseUrl.TrimEnd('/') + path;
     }
 
-    // ----------- UI apply -----------
-
     private void ApplyToUI(OverviewResponse data)
     {
-        if (currentEnergyPanel != null)
-            currentEnergyPanel.Set("Current Energy Consumption", FormatW(data.total.current_power_w));
-
-        if (monthEnergyPanel != null)
-            monthEnergyPanel.Set("This Month Energy Consumption", FormatKwh(data.total.month_energy_kwh));
+        SetPanel(currentEnergyPanel, "Current Energy Consumption", FormatW(data != null && data.total != null ? data.total.current_power_w : 0f));
+        SetPanel(monthEnergyPanel, "This Month Energy Consumption", FormatKwh(data != null && data.total != null ? data.total.month_energy_kwh : 0f));
 
         Dictionary<string, MeterBlock> byId = new Dictionary<string, MeterBlock>();
-        if (data.meters != null)
+        if (data != null && data.meters != null)
         {
             foreach (var m in data.meters)
             {
@@ -1315,23 +1266,81 @@ public class EnergyPanelController : MonoBehaviour
             }
         }
 
-        if (currentRightBoothPanel != null)
-            currentRightBoothPanel.Set("Current Right Paint Booth Usage", FormatW(GetCurrentW(byId, ID_RIGHT)));
+        SetPanel(currentJatoAreiaPanel, $"Current {LABEL_JATO_AREIA}", FormatW(GetCurrentW(byId, ID_JATO_AREIA)));
+        SetPanel(currentPinturaDireitaPanel, $"Current {LABEL_PINTURA_DIREITA}", FormatW(GetCurrentW(byId, ID_PINTURA_DIREITA)));
+        SetPanel(currentPinturaEsquerdaPanel, $"Current {LABEL_PINTURA_ESQUERDA}", FormatW(GetCurrentW(byId, ID_PINTURA_ESQUERDA)));
+        SetPanel(currentQuadroPainelSolarPanel, $"Current {LABEL_QUADRO_PAINEL_SOLAR}", FormatW(GetCurrentW(byId, ID_QUADRO_PAINEL_SOLAR)));
+        SetPanel(currentCompressorPanel, $"Current {LABEL_COMPRESSOR}", FormatW(GetCurrentW(byId, ID_COMPRESSOR)));
+        SetPanel(currentCarregadorParedePanel, $"Current {LABEL_CARREGADOR_PAREDE}", FormatW(GetCurrentW(byId, ID_CARREGADOR_PAREDE)));
+        SetPanel(currentBateChapasEsquerdaPanel, $"Current {LABEL_BATE_CHAPAS_ESQ}", FormatW(GetCurrentW(byId, ID_BATE_CHAPAS_ESQ)));
+        SetPanel(currentBateChapasDireitaPanel, $"Current {LABEL_BATE_CHAPAS_DIR}", FormatW(GetCurrentW(byId, ID_BATE_CHAPAS_DIR)));
+        SetPanel(currentArCondicionadoPanel, $"Current {LABEL_AR_CONDICIONADO}", FormatW(GetCurrentW(byId, ID_AR_CONDICIONADO)));
+        SetPanel(currentSalaConvivioPanel, $"Current {LABEL_SALA_CONVIVIO}", FormatW(GetCurrentW(byId, ID_SALA_CONVIVIO)));
+        SetPanel(currentTomadasOficinaPanel, $"Current {LABEL_TOMADAS_OFICINA}", FormatW(GetCurrentW(byId, ID_TOMADAS_OFICINA)));
+        SetPanel(currentPortaoEletricoPanel, $"Current {LABEL_PORTAO_ELETRICO}", FormatW(GetCurrentW(byId, ID_PORTAO_ELETRICO)));
 
-        if (currentLeftBoothPanel != null)
-            currentLeftBoothPanel.Set("Current Left Paint Booth Usage", FormatW(GetCurrentW(byId, ID_LEFT)));
+        SetPanel(monthJatoAreiaPanel, $"This Month {LABEL_JATO_AREIA}", FormatKwh(GetMonthKwh(byId, ID_JATO_AREIA)));
+        SetPanel(monthPinturaDireitaPanel, $"This Month {LABEL_PINTURA_DIREITA}", FormatKwh(GetMonthKwh(byId, ID_PINTURA_DIREITA)));
+        SetPanel(monthPinturaEsquerdaPanel, $"This Month {LABEL_PINTURA_ESQUERDA}", FormatKwh(GetMonthKwh(byId, ID_PINTURA_ESQUERDA)));
+        SetPanel(monthQuadroPainelSolarPanel, $"This Month {LABEL_QUADRO_PAINEL_SOLAR}", FormatKwh(GetMonthKwh(byId, ID_QUADRO_PAINEL_SOLAR)));
+        SetPanel(monthCompressorPanel, $"This Month {LABEL_COMPRESSOR}", FormatKwh(GetMonthKwh(byId, ID_COMPRESSOR)));
+        SetPanel(monthCarregadorParedePanel, $"This Month {LABEL_CARREGADOR_PAREDE}", FormatKwh(GetMonthKwh(byId, ID_CARREGADOR_PAREDE)));
+        SetPanel(monthBateChapasEsquerdaPanel, $"This Month {LABEL_BATE_CHAPAS_ESQ}", FormatKwh(GetMonthKwh(byId, ID_BATE_CHAPAS_ESQ)));
+        SetPanel(monthBateChapasDireitaPanel, $"This Month {LABEL_BATE_CHAPAS_DIR}", FormatKwh(GetMonthKwh(byId, ID_BATE_CHAPAS_DIR)));
+        SetPanel(monthArCondicionadoPanel, $"This Month {LABEL_AR_CONDICIONADO}", FormatKwh(GetMonthKwh(byId, ID_AR_CONDICIONADO)));
+        SetPanel(monthSalaConvivioPanel, $"This Month {LABEL_SALA_CONVIVIO}", FormatKwh(GetMonthKwh(byId, ID_SALA_CONVIVIO)));
+        SetPanel(monthTomadasOficinaPanel, $"This Month {LABEL_TOMADAS_OFICINA}", FormatKwh(GetMonthKwh(byId, ID_TOMADAS_OFICINA)));
+        SetPanel(monthPortaoEletricoPanel, $"This Month {LABEL_PORTAO_ELETRICO}", FormatKwh(GetMonthKwh(byId, ID_PORTAO_ELETRICO)));
+    }
 
-        if (currentSandBlastPanel != null)
-            currentSandBlastPanel.Set("Current Sand Blasting Usage", FormatW(GetCurrentW(byId, ID_SAND)));
+    private void ApplyErrorState()
+    {
+        const string na = "--";
 
-        if (monthRightBoothPanel != null)
-            monthRightBoothPanel.Set("This Month Right Paint Booth Usage", FormatKwh(GetMonthKwh(byId, ID_RIGHT)));
+        SetPanel(currentEnergyPanel, "Current Energy Consumption", na);
+        SetPanel(monthEnergyPanel, "This Month Energy Consumption", na);
 
-        if (monthLeftBoothPanel != null)
-            monthLeftBoothPanel.Set("This Month Left Paint Booth Usage", FormatKwh(GetMonthKwh(byId, ID_LEFT)));
+        SetPanel(currentJatoAreiaPanel, $"Current {LABEL_JATO_AREIA}", na);
+        SetPanel(currentPinturaDireitaPanel, $"Current {LABEL_PINTURA_DIREITA}", na);
+        SetPanel(currentPinturaEsquerdaPanel, $"Current {LABEL_PINTURA_ESQUERDA}", na);
+        SetPanel(currentQuadroPainelSolarPanel, $"Current {LABEL_QUADRO_PAINEL_SOLAR}", na);
+        SetPanel(currentCompressorPanel, $"Current {LABEL_COMPRESSOR}", na);
+        SetPanel(currentCarregadorParedePanel, $"Current {LABEL_CARREGADOR_PAREDE}", na);
+        SetPanel(currentBateChapasEsquerdaPanel, $"Current {LABEL_BATE_CHAPAS_ESQ}", na);
+        SetPanel(currentBateChapasDireitaPanel, $"Current {LABEL_BATE_CHAPAS_DIR}", na);
+        SetPanel(currentArCondicionadoPanel, $"Current {LABEL_AR_CONDICIONADO}", na);
+        SetPanel(currentSalaConvivioPanel, $"Current {LABEL_SALA_CONVIVIO}", na);
+        SetPanel(currentTomadasOficinaPanel, $"Current {LABEL_TOMADAS_OFICINA}", na);
+        SetPanel(currentPortaoEletricoPanel, $"Current {LABEL_PORTAO_ELETRICO}", na);
 
-        if (monthSandBlastPanel != null)
-            monthSandBlastPanel.Set("This Month Sand Blasting Usage", FormatKwh(GetMonthKwh(byId, ID_SAND)));
+        SetPanel(monthJatoAreiaPanel, $"This Month {LABEL_JATO_AREIA}", na);
+        SetPanel(monthPinturaDireitaPanel, $"This Month {LABEL_PINTURA_DIREITA}", na);
+        SetPanel(monthPinturaEsquerdaPanel, $"This Month {LABEL_PINTURA_ESQUERDA}", na);
+        SetPanel(monthQuadroPainelSolarPanel, $"This Month {LABEL_QUADRO_PAINEL_SOLAR}", na);
+        SetPanel(monthCompressorPanel, $"This Month {LABEL_COMPRESSOR}", na);
+        SetPanel(monthCarregadorParedePanel, $"This Month {LABEL_CARREGADOR_PAREDE}", na);
+        SetPanel(monthBateChapasEsquerdaPanel, $"This Month {LABEL_BATE_CHAPAS_ESQ}", na);
+        SetPanel(monthBateChapasDireitaPanel, $"This Month {LABEL_BATE_CHAPAS_DIR}", na);
+        SetPanel(monthArCondicionadoPanel, $"This Month {LABEL_AR_CONDICIONADO}", na);
+        SetPanel(monthSalaConvivioPanel, $"This Month {LABEL_SALA_CONVIVIO}", na);
+        SetPanel(monthTomadasOficinaPanel, $"This Month {LABEL_TOMADAS_OFICINA}", na);
+        SetPanel(monthPortaoEletricoPanel, $"This Month {LABEL_PORTAO_ELETRICO}", na);
+    }
+
+    private void SetCurrentUsage(MetricPanelUI panel, string label, float value)
+    {
+        SetPanel(panel, $"Current {label} Usage", FormatW(value));
+    }
+
+    private void SetMonthUsage(MetricPanelUI panel, string label, float value)
+    {
+        SetPanel(panel, $"This Month {label} Usage", FormatKwh(value));
+    }
+
+    private void SetPanel(MetricPanelUI panel, string title, string value)
+    {
+        if (panel != null)
+            panel.Set(title, value);
     }
 
     private float GetCurrentW(Dictionary<string, MeterBlock> byId, string id)
@@ -1348,33 +1357,14 @@ public class EnergyPanelController : MonoBehaviour
         return 0f;
     }
 
-    private void ApplyErrorState()
-    {
-        string na = "--";
-
-        if (currentEnergyPanel != null) currentEnergyPanel.Set("Current Energy Consumption", na);
-        if (monthEnergyPanel != null) monthEnergyPanel.Set("This Month Energy Consumption", na);
-
-        if (currentRightBoothPanel != null) currentRightBoothPanel.Set("Current Right Paint Booth Usage", na);
-        if (currentLeftBoothPanel != null) currentLeftBoothPanel.Set("Current Left Paint Booth Usage", na);
-        if (currentSandBlastPanel != null) currentSandBlastPanel.Set("Current Sand Blasting Usage", na);
-
-        if (monthRightBoothPanel != null) monthRightBoothPanel.Set("This Month Right Paint Booth Usage", na);
-        if (monthLeftBoothPanel != null) monthLeftBoothPanel.Set("This Month Left Paint Booth Usage", na);
-        if (monthSandBlastPanel != null) monthSandBlastPanel.Set("This Month Sand Blasting Usage", na);
-    }
-
     private string FormatW(float w) => $"{Mathf.Max(0f, w):0.##} W";
     private string FormatKwh(float k) => $"{Mathf.Max(0f, k):0.###} kWh";
 
     private string SelectEveryForRange(double totalHours)
     {
-        if (totalHours <= 24d)
-            return "1h";
-        if (totalHours <= 24d * 10d)
-            return "3h";
-        if (totalHours <= 24d * 120d)
-            return "1d";
+        if (totalHours <= 24d) return "1h";
+        if (totalHours <= 24d * 10d) return "3h";
+        if (totalHours <= 24d * 120d) return "1d";
         return "7d";
     }
 
@@ -1427,13 +1417,10 @@ public class EnergyPanelController : MonoBehaviour
         if (payload.categories.Count > 0)
         {
             int last = payload.categories.Count - 1;
-            if (string.IsNullOrEmpty(payload.categories[last]) && DateTime.TryParse(payload.timestamps[last], null, DateTimeStyles.RoundtripKind, out var dtLast))
+            if (string.IsNullOrEmpty(payload.categories[last]) &&
+                DateTime.TryParse(payload.timestamps[last], null, DateTimeStyles.RoundtripKind, out var dtLast))
             {
                 payload.categories[last] = dtLast.ToLocalTime().ToString(labelFormat);
-            }
-            else if (lastNonEmpty < 0)
-            {
-                payload.categories[last] = payload.categories[last];
             }
         }
 
@@ -1504,18 +1491,15 @@ public class EnergyPanelController : MonoBehaviour
             for (int i = 0; i < template.series.Count; i++)
             {
                 var s = template.series[i];
-                if (s == null || string.IsNullOrWhiteSpace(s.name))
-                    continue;
-                if (!names.Contains(s.name))
-                    names.Add(s.name);
+                if (s == null || string.IsNullOrWhiteSpace(s.name)) continue;
+                if (!names.Contains(s.name)) names.Add(s.name);
             }
         }
 
         if (names.Count == 0)
         {
-            names.Add(LABEL_SAND);
-            names.Add(LABEL_RIGHT);
-            names.Add(LABEL_LEFT);
+            for (int i = 0; i < METER_IDS.Length; i++)
+                names.Add(GetDefaultLabelForMeterId(METER_IDS[i]));
         }
 
         return names;
@@ -1637,9 +1621,67 @@ public class EnergyPanelController : MonoBehaviour
         return "1h";
     }
 
+    private string GetDefaultLabelForMeterId(string meterId)
+    {
+        switch (meterId)
+        {
+            case ID_JATO_AREIA: return LABEL_JATO_AREIA;
+            case ID_PINTURA_DIREITA: return LABEL_PINTURA_DIREITA;
+            case ID_PINTURA_ESQUERDA: return LABEL_PINTURA_ESQUERDA;
+            case ID_QUADRO_PAINEL_SOLAR: return LABEL_QUADRO_PAINEL_SOLAR;
+            case ID_COMPRESSOR: return LABEL_COMPRESSOR;
+            case ID_CARREGADOR_PAREDE: return LABEL_CARREGADOR_PAREDE;
+            case ID_BATE_CHAPAS_ESQ: return LABEL_BATE_CHAPAS_ESQ;
+            case ID_BATE_CHAPAS_DIR: return LABEL_BATE_CHAPAS_DIR;
+            case ID_AR_CONDICIONADO: return LABEL_AR_CONDICIONADO;
+            case ID_SALA_CONVIVIO: return LABEL_SALA_CONVIVIO;
+            case ID_TOMADAS_OFICINA: return LABEL_TOMADAS_OFICINA;
+            case ID_PORTAO_ELETRICO: return LABEL_PORTAO_ELETRICO;
+            default: return meterId;
+        }
+    }
 
+    private PowerTimeseriesMeter GetPowerTimeseriesMeter(PowerTimeseriesMeters meters, string meterId)
+    {
+        if (meters == null) return null;
 
+        switch (meterId)
+        {
+            case ID_JATO_AREIA: return meters.shelly3EMJatoAreia;
+            case ID_PINTURA_DIREITA: return meters.shelly3EMPinturaDireita;
+            case ID_PINTURA_ESQUERDA: return meters.shelly3EMPinturaEsquerda;
+            case ID_QUADRO_PAINEL_SOLAR: return meters.shelly3EMQuadroPainelSolar;
+            case ID_COMPRESSOR: return meters.shelly3EMCompressor;
+            case ID_CARREGADOR_PAREDE: return meters.shelly3EMCarregadorParede;
+            case ID_BATE_CHAPAS_ESQ: return meters.shelly3EMBateChapasEsquerda;
+            case ID_BATE_CHAPAS_DIR: return meters.shelly3EMBateChapasDireita;
+            case ID_AR_CONDICIONADO: return meters.shellyProEM50ArCondicionado;
+            case ID_SALA_CONVIVIO: return meters.shellyProEM50SalaConvivio;
+            case ID_TOMADAS_OFICINA: return meters.shellyProEM50TomadasOficina;
+            case ID_PORTAO_ELETRICO: return meters.shellyProEM50PortaoEletrico;
+            default: return null;
+        }
+    }
+
+    private EnergyDayMeter GetEnergyDayMeter(EnergyDayMeters meters, string meterId)
+    {
+        if (meters == null) return null;
+
+        switch (meterId)
+        {
+            case ID_JATO_AREIA: return meters.shelly3EMJatoAreia;
+            case ID_PINTURA_DIREITA: return meters.shelly3EMPinturaDireita;
+            case ID_PINTURA_ESQUERDA: return meters.shelly3EMPinturaEsquerda;
+            case ID_QUADRO_PAINEL_SOLAR: return meters.shelly3EMQuadroPainelSolar;
+            case ID_COMPRESSOR: return meters.shelly3EMCompressor;
+            case ID_CARREGADOR_PAREDE: return meters.shelly3EMCarregadorParede;
+            case ID_BATE_CHAPAS_ESQ: return meters.shelly3EMBateChapasEsquerda;
+            case ID_BATE_CHAPAS_DIR: return meters.shelly3EMBateChapasDireita;
+            case ID_AR_CONDICIONADO: return meters.shellyProEM50ArCondicionado;
+            case ID_SALA_CONVIVIO: return meters.shellyProEM50SalaConvivio;
+            case ID_TOMADAS_OFICINA: return meters.shellyProEM50TomadasOficina;
+            case ID_PORTAO_ELETRICO: return meters.shellyProEM50PortaoEletrico;
+            default: return null;
+        }
+    }
 }
-
-
-
